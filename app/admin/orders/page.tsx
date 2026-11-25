@@ -367,7 +367,7 @@ export default function AdminOrdersPage() {
                     Across {totalOrdersCount} completed bills
                   </p>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-[#A4164E]">
+                <div className="w-10 h-10 rounded-xl bg-[#FBEFE6] flex items-center justify-center text-[#A4164E]">
                   <TrendingUp className="w-5 h-5" />
                 </div>
               </div>
@@ -586,7 +586,7 @@ export default function AdminOrdersPage() {
                             <Link
                               href={`/invoice/${o.id}`}
                               title="View Tax Invoice"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-pink-50 hover:bg-pink-100 text-[#A4164E] text-xs font-bold rounded-lg transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FBEFE6] hover:bg-[#F6E2D3] text-[#A4164E] text-xs font-bold rounded-lg transition-colors"
                             >
                               <FileText className="w-3.5 h-3.5" /> Invoice
                             </Link>

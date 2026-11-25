@@ -354,7 +354,7 @@ export default function AdminAnalyticsPage() {
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                 Total Realized Revenue
               </span>
-              <div className="w-8 h-8 rounded-xl bg-pink-50 flex items-center justify-center text-[#A4164E]">
+              <div className="w-8 h-8 rounded-xl bg-[#FBEFE6] flex items-center justify-center text-[#A4164E]">
                 <IndianRupee className="w-4 h-4" />
               </div>
             </div>
@@ -419,7 +419,7 @@ export default function AdminAnalyticsPage() {
               label: "Split",
               amount: pay.splitAmount,
               note: `${pay.splitBills} bill${pay.splitBills === 1 ? "" : "s"} · Cash ₹${formatINR(pay.splitCash)} + GPay ₹${formatINR(pay.splitGpay)}`,
-              cls: "bg-pink-50 text-[#A4164E]",
+              cls: "bg-[#FBEFE6] text-[#A4164E]",
             },
           ].map((b) => (
             <div key={b.label} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs flex flex-col justify-between">

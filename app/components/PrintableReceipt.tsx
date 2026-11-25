@@ -394,7 +394,7 @@ export default function PrintableReceipt({ order, paper, size }: PrintableReceip
             className={`inline-block px-3 py-1 text-xs font-black rounded uppercase tracking-wider ${
               isUnsettledCredit
                 ? "bg-amber-100 text-amber-900 border border-amber-300"
-                : "bg-pink-50 border border-pink-200 text-[#A4164E]"
+                : "bg-[#FBEFE6] border border-[#EBCDB6] text-[#A4164E]"
             }`}
           >
             {title}

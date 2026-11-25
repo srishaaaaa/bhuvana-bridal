@@ -367,7 +367,7 @@ export default function OutstandingCredits({
       subtext: `${allOutstanding.length} Pending Credit Bills`,
       icon: IndianRupee,
       textColor: "text-[#A4164E]",
-      bgColor: "bg-pink-50/70",
+      bgColor: "bg-[#FBEFE6]/70",
       borderColor: "border-[#A4164E]/20",
       iconBg: "bg-[#A4164E]/10 text-[#A4164E]",
     },
@@ -728,7 +728,7 @@ export default function OutstandingCredits({
                       const isDueToday = order.daysOverdue === 0;
 
                       return (
-                        <tr key={order.id} className="hover:bg-pink-50/20 transition-colors">
+                        <tr key={order.id} className="hover:bg-[#FBEFE6]/20 transition-colors">
                           <td className="p-3.5 font-mono font-bold text-gray-800">
                             {order.invoice_number || order.invoice_no || order.invoiceNo || order.order_id || `#INV-${String(order.id).slice(0, 8).toUpperCase()}`}
                           </td>

@@ -24,7 +24,7 @@ export default function Home() {
       {/* Main Info */}
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 flex flex-col justify-center items-center py-12">
         <div className="bg-white border border-[#A4164E]/20 rounded-3xl p-8 sm:p-12 shadow-xl w-full text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#A4164E] via-pink-400 to-[#A4164E]" />
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#A4164E] via-[#C9A063] to-[#A4164E]" />
 
           <span className="inline-block px-3.5 py-1 bg-[#A4164E]/10 border border-[#A4164E]/30 text-[#A4164E] text-[11px] font-black rounded-full tracking-wider uppercase mb-6">
             Bridal Wear &amp; Covering

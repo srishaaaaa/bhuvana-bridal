@@ -173,7 +173,7 @@ export default function StaffPunch({ embedded = false }: { embedded?: boolean })
 
       {/* Main Card */}
       <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 border border-[#A4164E]/25 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#A4164E] via-pink-400 to-[#A4164E]" />
+        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#A4164E] via-[#C9A063] to-[#A4164E]" />
 
         <div className="text-center mb-6">
           <div className="w-20 h-20 rounded-2xl bg-[#FDF1E6] ring-1 ring-[#B8893E]/40 mx-auto mb-3 overflow-hidden shadow-sm">

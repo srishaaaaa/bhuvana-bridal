@@ -683,7 +683,7 @@ export default function Measurements({
                   </button>
                   <button
                     onClick={() => setPrintDialog({ list: [r], fromPreview: false })}
-                    className="p-2.5 rounded-lg bg-pink-50 text-[#A4164E] hover:bg-pink-100 transition-colors cursor-pointer"
+                    className="p-2.5 rounded-lg bg-[#FBEFE6] text-[#A4164E] hover:bg-[#F6E2D3] transition-colors cursor-pointer"
                     title="Print"
                     aria-label="Print"
                   >

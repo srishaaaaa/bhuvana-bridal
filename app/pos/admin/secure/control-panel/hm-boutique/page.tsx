@@ -3309,22 +3309,24 @@ export default function POSBilling() {
 
         {/* Floating PWA Install Card */}
         {deferredPrompt && !isPwaInstalled && (
-          <div className="fixed bottom-6 right-6 z-50 bg-black border border-pink-500/30 rounded-2xl p-3 px-4 flex items-center gap-3.5 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="w-10 h-10 rounded-xl border border-pink-500/40 flex items-center justify-center text-pink-500 shrink-0">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div className="text-left">
-              <div className="text-[11px] font-black uppercase tracking-wider text-white">
-                INSTALL {BRAND_EN.toUpperCase()}
+          <div className="fixed bottom-6 right-6 z-50 max-w-[calc(100vw-3rem)] bg-[#FFF7EE] border border-[#C9A063]/60 rounded-2xl p-3 pl-3 pr-3.5 flex items-center gap-3.5 shadow-[0_18px_45px_-12px_rgba(94,11,43,0.45)] animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <img
+              src="/logo.png"
+              alt=""
+              className="w-11 h-11 rounded-xl object-cover shrink-0 ring-1 ring-[#C9A063]/60"
+            />
+            <div className="text-left min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-wider text-[#5E0B2B] truncate">
+                Install {BRAND_EN}
               </div>
-              <div className="text-[10px] text-gray-400 font-semibold">
-                POS & Billing App
+              <div className="text-[10px] text-[#8A6A3A] font-semibold flex items-center gap-1">
+                <Smartphone className="w-3 h-3" /> POS &amp; Billing App
               </div>
             </div>
             <button
               type="button"
               onClick={handleInstallPwa}
-              className="bg-[#e6007e] hover:bg-pink-700 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer ml-1"
+              className="bg-gradient-to-r from-[#A4164E] to-[#5E0B2B] hover:from-[#85103E] hover:to-[#4A0822] text-[#F6E3B4] text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-md"
             >
               <Download className="w-3.5 h-3.5" />
               INSTALL

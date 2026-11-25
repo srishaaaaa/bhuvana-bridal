@@ -1032,7 +1032,7 @@ export default function WorkAllocation({ role = 'admin' }: WorkAllocationProps) 
       {/* 4 Top Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
         {[
-          { label: 'Total Jobs',        value: stats.totalJobs,        bg: 'from-pink-50 to-rose-50',     icon: <Briefcase size={18} className="text-[#A4164E]" /> },
+          { label: 'Total Jobs',        value: stats.totalJobs,        bg: 'from-[#FBEFE6] to-rose-50',     icon: <Briefcase size={18} className="text-[#A4164E]" /> },
           { label: 'Total Staff',       value: stats.totalStaff,       bg: 'from-purple-50 to-violet-50', icon: <Users size={18} className="text-purple-500" /> },
           { label: 'Assignments',      value: stats.totalAssignments, bg: 'from-blue-50 to-indigo-50',   icon: <ClipboardList size={18} className="text-blue-500" /> },
           { label: 'Units Completed',   value: `${stats.totalUnitsDone} / ${stats.totalUnitsAssigned}`, bg: 'from-emerald-50 to-teal-50', icon: <BarChart2 size={18} className="text-emerald-500" /> },

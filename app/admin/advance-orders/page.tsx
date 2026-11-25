@@ -571,7 +571,7 @@ export default function AdminAdvanceOrdersPage() {
                             )}
                             <Link
                               href={`/advance/${(a as any).invoiceNo || a.invoice_no || a.id}`}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-pink-50 hover:bg-pink-100 text-[#A4164E] text-xs font-bold rounded-lg transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FBEFE6] hover:bg-[#F6E2D3] text-[#A4164E] text-xs font-bold rounded-lg transition-colors"
                             >
                               <FileText className="w-3.5 h-3.5" /> Receipt
                             </Link>
