@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+:root {
+  --shop-card-rgb: 164 22 78;
+  --shop-accent-rgb: 164 22 78;
+  --shop-soft-rgb: 255 247 238;
+  --shop-tint-rgb: 255 247 238;
+  --shop-deep-rgb: 164 22 78;
+  --shop-on-card: #FFFFFF;
+
+  --primary: #A4164E;
+  --secondary: #A4164E;
+  --tertiary: #FBEFE6;
+}
+
+body {
+  font-family: var(--font-poppins), system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-color: #FFFFFF;
+  color: #111111;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar in Bhuvana ruby rose */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #A4164E;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #85103E;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Utility classes matching HM design tokens */
+.bg-bgMain {
+  background-color: rgb(var(--shop-tint-rgb, 255 247 238)) !important;
+}
+.bg-cardBg {
+  background-color: #FFFFFF !important;
+}
+.border-shopSoft {
+  border-color: rgb(var(--shop-soft-rgb, 255 247 238)) !important;
+}
+
+.minimal-input {
+  width: 100%;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.5rem 0;
+  color: #000000;
+  transition: border-color 0.2s;
+}
+.minimal-input:focus {
+  outline: none;
+  border-bottom-color: #A4164E;
+}
+
+/* Hide number input spin buttons */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+@theme {
+  --color-primary: #A4164E;
+  --color-secondary: #A4164E;
+  --color-tertiary: #FBEFE6;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-swing: swing 2.5s ease-in-out infinite;
+  --animate-pop: pop 2s ease-in-out infinite;
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+  @keyframes swing {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(5deg); }
+  }
+  @keyframes pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+}
+
+/* ── PRINT STYLES — A4 & Thermal Invoices ─────────────────────────── */
+@media print {
+  /* Strict Isolation: hide every direct child of body except #print-root */
+  body.printing-isolated > *:not(#print-root) {
+    display: none !important;
+  }
+
+  body.printing-isolated #print-root {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .no-print,
+  .print-hidden,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+

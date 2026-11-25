@@ -1,0 +1,639 @@
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  History,
+  Search,
+  RefreshCw,
+  FileText,
+  Printer,
+  ChevronDown,
+  Calendar,
+  CreditCard,
+  ShoppingBag,
+  TrendingUp,
+  AlertCircle,
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { refreshOnFocus } from "@/lib/focusRefresh";
+import { removeOrder } from "@/app/pos/actions";
+import { BRAND_EN } from "@/lib/brand";
+import { ORDER_STATUS } from "@/lib/orderStatus";
+import { normalizeOrder } from "@/lib/normalizeOrder";
+import { getOrderTotals } from "@/lib/orderTotals";
+
+export const dynamic = "force-dynamic";
+
+type PeriodFilter = "ALL" | "TODAY" | "WEEK" | "MONTH" | "YEAR";
+
+interface OrderCustomer {
+  name?: string | null;
+  phone?: string | null;
+  address?: string | null;
+}
+
+interface OrderItem {
+  id: string;
+  snapshot_name: string;
+  snapshot_price: number;
+  quantity: number;
+}
+
+interface OrderRecord {
+  id: string;
+  invoice_no?: string;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  customer_address?: string | null;
+  customers?: OrderCustomer | null;
+  source?: string;
+  status: string;
+  is_gst: boolean;
+  subtotal: number;
+  discount_amount?: number;
+  gst_percentage?: number;
+  gst_amount?: number;
+  delivery_fee?: number;
+  grand_total: number;
+  cash_received?: number;
+  payment_mode: string;
+  payment_method?: string;
+  is_credit?: boolean;
+  credit_status?: string | null;
+  balance_due?: number;
+  bill_date?: string;
+  created_at: string;
+  is_advance?: boolean | null;
+  order_type?: string | null;
+  order_items?: OrderItem[];
+  items?: OrderItem[];
+}
+
+// ─── Skeleton components ───────────────────────────────────────────────────────
+
+function StatCardSkeleton() {
+  return (
+    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex justify-between items-center animate-pulse">
+      <div className="space-y-2">
+        <div className="h-2.5 bg-gray-200 rounded w-32" />
+        <div className="h-6 bg-gray-200 rounded w-24 mt-1" />
+        <div className="h-2 bg-gray-100 rounded w-36 mt-1" />
+      </div>
+      <div className="w-10 h-10 rounded-xl bg-gray-100" />
+    </div>
+  );
+}
+
+function TableRowSkeleton() {
+  return (
+    <tr className="animate-pulse">
+      {Array.from({ length: 9 }).map((_, i) => (
+        <td key={i} className="px-4 py-3">
+          <div className="h-3 bg-gray-100 rounded w-full" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
+export default function AdminOrdersPage() {
+  const router = useRouter();
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  // show 50 bills at a time - rendering thousands of rows at once freezes the page
+  const PAGE = 50;
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("ALL");
+  const [gstFilter, setGstFilter] = useState<"ALL" | "GST" | "NONGST">("ALL");
+
+  const formatINR = (val: number) =>
+    Number(val || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const fetchOrders = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    setFetchError(null);
+
+    try {
+      // Column names verified against actual DB schema:
+      // phone (not customer_phone), total (not grand_total), total_gst, gst_enabled,
+      // delivery_charge, manual_discount_type/value, no gst_percentage/bill_date columns
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "id, invoice_no, customer_name, phone, address, status, order_type, is_advance," +
+          " is_credit, credit_status, subtotal, gst_enabled, total_gst, gst_amount," +
+          " total, delivery_charge, shipping, discount_amount, manual_discount_amount," +
+          " manual_discount_type, manual_discount_value, payment_mode, payment_method," +
+          " amount_paid, balance_due, cash_received, created_at, items," +
+          " order_items(id, product_name, name, quantity, base_price, line_total)"
+        )
+        .eq("status", "COMPLETED")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Order fetch error:", error);
+        setFetchError(error.message);
+        return;
+      }
+
+      // Order History = status = COMPLETED (and nothing else)
+      const visibleOrders = (data || [])
+        .map(normalizeOrder)
+        .filter((order: any) => (order?.status || "").toUpperCase() === ORDER_STATUS.COMPLETED);
+
+      setOrders(visibleOrders as any);
+    } catch (err: any) {
+      console.error("Failed to load orders:", err);
+      setFetchError(err?.message || "Failed to load order history");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  const handleDeleteOrder = async (orderId: string, invoiceNo?: string) => {
+    if (!window.confirm("Delete this invoice permanently? This cannot be undone.")) return;
+    try {
+      // 1. Delete child rows first (order_items)
+      await supabase.from("order_items").delete().eq("order_id", orderId);
+
+      // 2. Delete genuine order row targeting exact primary key
+      const { data, error } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId)
+        .select("id");
+
+      if (error || !data || data.length === 0) {
+        const errorMsg = error?.message ?? "Delete blocked (0 rows affected, check RLS)";
+        console.error("Order deletion failed:", errorMsg);
+        alert(`Failed to delete invoice: ${errorMsg}`);
+        return;
+      }
+
+      // Also clean up advance_orders record if linked
+      if (invoiceNo) {
+        await supabase.from("advance_orders").delete().eq("deposit_id", invoiceNo);
+      }
+
+      // 3. Update local state ONLY after confirmed success, then refresh router
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      router.refresh();
+      await fetchOrders(true);
+    } catch (err: any) {
+      console.error("Failed to delete order:", err);
+      alert(`Failed to delete invoice: ${err?.message || "database rejected the delete"}`);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+
+    return refreshOnFocus(() => fetchOrders(true));
+  }, [fetchOrders]);
+
+  // Apply Search, Period, and GST Filters
+  const filteredOrders = orders.filter((o) => {
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const idMatch = (o.id || "").toLowerCase().includes(q);
+      const invoiceMatch = (o.invoice_no || "").toLowerCase().includes(q);
+      const nameMatch = (
+        o.customers?.name ||
+        o.customer_name ||
+        ""
+      )
+        .toLowerCase()
+        .includes(q);
+      const phoneMatch = (
+        o.customers?.phone ||
+        o.customer_phone ||
+        ""
+      )
+        .toLowerCase()
+        .includes(q);
+      if (!idMatch && !invoiceMatch && !nameMatch && !phoneMatch) return false;
+    }
+
+    // 2. GST Filter
+    const orderTotals = getOrderTotals(o);
+    const hasGst = orderTotals.gstAmount > 0;
+    if (gstFilter === "GST" && !hasGst) return false;
+    if (gstFilter === "NONGST" && hasGst) return false;
+
+    // 3. Period Filter
+    if (periodFilter === "ALL") return true;
+
+    const orderDate = new Date(o.created_at || o.bill_date || "");
+    if (isNaN(orderDate.getTime())) return true;
+    const now = new Date();
+
+    if (periodFilter === "TODAY") {
+      return (
+        orderDate.getDate() === now.getDate() &&
+        orderDate.getMonth() === now.getMonth() &&
+        orderDate.getFullYear() === now.getFullYear()
+      );
+    }
+    if (periodFilter === "WEEK") {
+      const startOfWeek = new Date(now);
+      const day = startOfWeek.getDay();
+      startOfWeek.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1));
+      startOfWeek.setHours(0, 0, 0, 0);
+      return orderDate >= startOfWeek;
+    }
+    if (periodFilter === "MONTH") {
+      return (
+        orderDate.getMonth() === now.getMonth() &&
+        orderDate.getFullYear() === now.getFullYear()
+      );
+    }
+    if (periodFilter === "YEAR") {
+      return orderDate.getFullYear() === now.getFullYear();
+    }
+
+    return true;
+  });
+
+  useEffect(() => {
+    setVisibleCount(PAGE);
+  }, [filteredOrders.length]);
+
+  // Calculate Realized Financial Totals strictly across filtered completed orders
+  const totalRevenue = filteredOrders.reduce(
+    (sum, o) => sum + getOrderTotals(o).grandTotal,
+    0
+  );
+  const totalTaxable = filteredOrders.reduce(
+    (sum, o) => sum + getOrderTotals(o).subtotal,
+    0
+  );
+  const totalGst = filteredOrders.reduce(
+    (sum, o) => sum + getOrderTotals(o).gstAmount,
+    0
+  );
+  const totalOrdersCount = filteredOrders.length;
+  const avgBillValue = totalOrdersCount > 0 ? totalRevenue / totalOrdersCount : 0;
+
+  return (
+    <div className="min-h-screen bg-[#FFF7EE] text-[#111111] font-sans p-4 sm:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#A4164E]/20 shadow-xs">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Link
+                href="/pos/admin/secure/control-panel/hm-boutique"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-[#A4164E] transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to POS Control Panel
+              </Link>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <History className="w-6 h-6 text-[#A4164E]" />
+              {BRAND_EN} — Order History
+            </h1>
+            <p className="text-xs text-gray-500 mt-0.5 font-medium">
+              Completed sales register and finalized advance orders. Active advance orders are isolated in Advance Orders.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchOrders(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </button>
+            <Link
+              href="/admin/advance-orders"
+              className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold rounded-xl border border-amber-200 shadow-xs transition-colors"
+            >
+              Advance Orders
+            </Link>
+            <Link
+              href="/admin/outstanding-credits"
+              className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-bold rounded-xl border border-blue-200 shadow-xs transition-colors"
+            >
+              Outstanding Credits
+            </Link>
+            <Link
+              href="/admin/analytics"
+              className="px-3.5 py-2 bg-[#A4164E] hover:bg-[#D4008A] text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
+            >
+              Analytics
+            </Link>
+          </div>
+        </div>
+
+        {/* Realized Sales Summary Cards — skeleton while loading */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {loading ? (
+            <>
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </>
+          ) : (
+            <>
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Total Realized Sales
+                  </p>
+                  <p className="text-xl font-black text-[#A4164E] mt-1 font-mono">
+                    ₹{formatINR(totalRevenue)}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Across {totalOrdersCount} completed bills
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center text-[#A4164E]">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Completed Orders
+                  </p>
+                  <p className="text-xl font-black text-gray-900 mt-1">
+                    {totalOrdersCount}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Standard sales + settled deposits
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Total Taxable Value
+                  </p>
+                  <p className="text-xl font-black text-gray-900 mt-1 font-mono">
+                    ₹{formatINR(totalTaxable)}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Excludes GST &amp; delivery
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex justify-between items-center">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    Average Bill Value
+                  </p>
+                  <p className="text-xl font-black text-gray-900 mt-1 font-mono">
+                    ₹{formatINR(avgBillValue)}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Per finalized customer sale
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                  <Calendar className="w-5 h-5" />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Filters and Search Bar */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-[200px] w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 shrink-0 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by invoice ID, customer name, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#A4164E]/20 focus:border-[#A4164E]"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {/* Period Filter */}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl font-semibold">
+              {(["ALL", "TODAY", "WEEK", "MONTH", "YEAR"] as PeriodFilter[]).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setPeriodFilter(period)}
+                  className={`px-3 py-1 rounded-lg text-[11px] transition-all cursor-pointer ${
+                    periodFilter === period
+                      ? "bg-white text-gray-900 shadow-xs font-bold"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {period === "ALL" ? "All Time" : period.charAt(0) + period.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* GST Filter */}
+            <select
+              value={gstFilter}
+              onChange={(e) => setGstFilter(e.target.value as any)}
+              className="px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer focus:outline-none"
+            >
+              <option value="ALL">All Bills (GST + Non-GST)</option>
+              <option value="GST">GST Invoices Only</option>
+              <option value="NONGST">Non-GST Bills Only</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Orders Table */}
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/80">
+                  <th className="px-4 py-3">Invoice ID</th>
+                  <th className="px-4 py-3">Date &amp; Time</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Mode</th>
+                  <th className="px-4 py-3 text-right">Subtotal</th>
+                  <th className="px-4 py-3 text-right">GST</th>
+                  <th className="px-4 py-3 text-right">Grand Total</th>
+                  <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  /* Skeleton rows — never show empty state or zeros while loading */
+                  Array.from({ length: 7 }).map((_, i) => (
+                    <TableRowSkeleton key={i} />
+                  ))
+                ) : fetchError ? (
+                  /* Error state with retry */
+                  <tr>
+                    <td colSpan={9} className="p-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <AlertCircle className="w-8 h-8 text-red-400" />
+                        <p className="text-sm font-bold text-red-600">Failed to load order history</p>
+                        <p className="text-xs text-gray-500 max-w-sm">{fetchError}</p>
+                        <button
+                          onClick={() => fetchOrders()}
+                          className="px-4 py-2 bg-[#A4164E] text-white text-xs font-bold rounded-xl hover:bg-[#D4008A] transition-colors cursor-pointer"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredOrders.length === 0 ? (
+                  /* Empty state — only shown when loading is DONE and result is truly empty */
+                  <tr>
+                    <td colSpan={9} className="p-12 text-center text-xs font-bold text-gray-500">
+                      No matching completed orders found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.slice(0, visibleCount).map((o) => {
+                    const custName = o.customers?.name || o.customer_name || "Counter Customer";
+                    const custPhone = o.customers?.phone || o.customer_phone || "";
+                    const totals = getOrderTotals(o);
+                    const subtotal = totals.subtotal;
+                    const gstAmount = totals.gstAmount;
+                    const grandTotal = totals.grandTotal;
+
+                    const dateStr = o.created_at
+                      ? new Date(o.created_at).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : o.bill_date || "—";
+
+                    const timeStr = o.created_at
+                      ? new Date(o.created_at).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })
+                      : "";
+
+                    const displayInvoiceNo = (o.invoice_no || o.id || "").replace(/^DEP-/i, "INV-");
+
+                    return (
+                      <tr key={o.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold text-gray-900">
+                          {displayInvoiceNo}
+                          {(o.is_advance || o.order_type === "ADVANCE") && (
+                            <span className="ml-1.5 px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">
+                              ADVANCE
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          <div>{dateStr}</div>
+                          {timeStr && <div className="text-[10px] text-gray-400">{timeStr}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{custName}</div>
+                          {custPhone && <div className="text-[11px] font-mono text-gray-400">{custPhone}</div>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-800">
+                            {o.payment_mode || "CASH"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-600">
+                          ₹{formatINR(subtotal)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-600">
+                          {gstAmount > 0 ? `₹${formatINR(gstAmount)}` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono font-black text-gray-950">
+                          ₹{formatINR(grandTotal)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            COMPLETED
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              href={`/invoice/${o.id}`}
+                              title="View Tax Invoice"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-pink-50 hover:bg-pink-100 text-[#A4164E] text-xs font-bold rounded-lg transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" /> Invoice
+                            </Link>
+                            <button
+                              onClick={() => handleDeleteOrder(o.id, o.invoice_no)}
+                              title="Delete Invoice"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+            {filteredOrders.length > visibleCount && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <span className="text-xs font-bold text-gray-500">
+                  Showing {Math.min(visibleCount, filteredOrders.length).toLocaleString("en-IN")} of {filteredOrders.length.toLocaleString("en-IN")} orders
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setVisibleCount((v) => v + PAGE)}
+                    className="px-4 py-2 rounded-lg bg-[#A4164E] hover:bg-[#85103E] text-white text-[11px] font-black uppercase tracking-wider cursor-pointer"
+                  >
+                    Show {PAGE} more
+                  </button>
+                  <button
+                    onClick={() => setVisibleCount(filteredOrders.length)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-[11px] font-bold hover:bg-gray-100 cursor-pointer"
+                  >
+                    Show all
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-4 text-center text-[10px] text-gray-400">
+          Powered by Cenexa Systems © 2026
+        </div>
+      </div>
+    </div>
+  );
+}

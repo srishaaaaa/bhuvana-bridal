@@ -1,0 +1,2557 @@
+import { metaToOrderFields, buildSplitDetails, estimateGstPercent } from './orderMeta';
+import { sql } from './db';
+import { BROCHURE_CATALOGUE_ITEMS, OFFICIAL_COURSE_CATEGORIES, catalogItemToProduct } from './courses';
+import { isSupabaseConfigured, supabase } from './supabase';
+import { calculateOrderTotals } from './orderTotals';
+import {
+  Product,
+  Category,
+  Customer,
+  OrderRow,
+  OrderItemRow,
+  OrderWithRelations,
+  CartItem,
+  Expense,
+  PaymentMode,
+  AdvanceOrderRow,
+  AdvanceOrderItemRow,
+  AdvanceOrderStatus,
+  AdvanceOrderWithRelations,
+} from './types';
+
+// Utility to generate unique ID
+const uid = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const isUuid = (val: unknown): boolean =>
+  typeof val === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
+const keyFilter = (id: string, col: string = 'invoice_no'): string => {
+  if (!id || typeof id !== 'string' || !id.trim()) {
+    return `${col}.eq.__invalid_id__`;
+  }
+  const cleanId = id.trim();
+  return isUuid(cleanId) ? `id.eq.${cleanId},${col}.eq.${cleanId}` : `${col}.eq.${cleanId}`;
+};
+
+const mapStatus = (rawStatus: any): AdvanceOrderStatus => {
+  const s = String(rawStatus || '').toLowerCase();
+  if (s === 'completed' || s === 'paid') return 'COMPLETED';
+  if (s === 'cancelled' || s === 'canceled' || s === 'void') return 'CANCELLED';
+  if (s === 'ready' || s === 'ready_for_delivery') return 'READY';
+  return 'PENDING';
+};
+
+export const dbStore = {
+  // â”€â”€ CATEGORIES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async listCategories(): Promise<Category[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          return data.map((c: any) => ({
+            id: String(c.id),
+            name: c.name_en || c.name || '',
+            created_at: c.created_at || new Date().toISOString(),
+            is_active: c.is_active !== false,
+            sort_order: c.sort_order || 0,
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase categories fetch failed, falling back to local SQL:', err);
+      }
+    }
+
+    try {
+      const rows = await sql`SELECT * FROM categories ORDER BY name ASC`;
+      return rows as Category[];
+    } catch {
+      return [];
+    }
+  },
+
+  async addCategory(name: string): Promise<Category> {
+    const trimmed = name.trim();
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .insert({ name_en: trimmed, is_active: true })
+          .select()
+          .single();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            name: data.name_en || trimmed,
+            created_at: data.created_at || new Date().toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase category insert failed:', err);
+      }
+    }
+
+    const id = uid();
+    try {
+      const rows = await sql`
+        INSERT INTO categories (id, name)
+        VALUES (${id}, ${trimmed})
+        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING *
+      `;
+      return rows[0] as Category;
+    } catch {
+      return { id, name: trimmed, created_at: new Date().toISOString() };
+    }
+  },
+
+  async updateCategory(id: string, name: string): Promise<Category | null> {
+    const trimmed = name.trim();
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .update({ name_en: trimmed })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            name: data.name_en || trimmed,
+            created_at: data.created_at,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase category update failed:', err);
+      }
+    }
+
+    try {
+      const rows = await sql`UPDATE categories SET name = ${trimmed} WHERE id = ${id} RETURNING *`;
+      return rows.length > 0 ? (rows[0] as Category) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteCategory(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('categories').update({ is_active: false }).eq('id', id);
+        return;
+      } catch (err) {
+        console.warn('Supabase category delete failed:', err);
+      }
+    }
+
+    try {
+      await sql`DELETE FROM categories WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  // â”€â”€ PRODUCTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async listProducts(): Promise<Product[]> {
+    const isPseudo = (name: string) => {
+      const n = (name || '').toLowerCase().trim();
+      return n.includes('(full package') ||
+        n === 'basics course' ||
+        n === 'diploma course' ||
+        n === 'fashion designing diploma' ||
+        n === 'blouse only course' ||
+        n === 'salwar only course';
+    };
+
+    // Brochure catalogue acts as authoritative fallback / merge source
+    const brochureFallback: Product[] = BROCHURE_CATALOGUE_ITEMS.map(item => catalogItemToProduct(item) as unknown as Product);
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+
+        if (!error && data) {
+          const normalized: Product[] = data
+            .filter((p: any) => !isPseudo(p.name))
+            .map((p: any) => ({
+              id: String(p.id),
+              name: p.name || '',
+              description: p.description || null,
+              category: p.category || '',
+              gst_rate: Number(p.gst_percent || 0),
+              hsn_code: p.barcode || p.sku || null,
+              barcode: p.barcode || null,
+              // selling_price: prefer price column first (direct fee), fall back to offer_price
+              selling_price: Number(p.price || p.offer_price || 0),
+              sku: p.sku || `SKU-${p.id}`,
+              stock_quantity: Number(p.stock_quantity ?? p.stock ?? 0),
+              low_stock_alert: Number(p.low_stock_alert || 5),
+              purchase_price: Number(p.purchase_price || 0),
+              price: Number(p.price || 0),
+              offer_price: p.offer_price ? Number(p.offer_price) : null,
+              unit: p.unit || 'Pattern',
+              unit_label: p.unit_label || p.duration || 'Pattern',
+              item_type: p.item_type || 'service',
+              is_active: p.is_active !== false,
+              created_at: p.created_at || new Date().toISOString(),
+              image_url: p.image_url || p.image || null,
+            }));
+
+          // Merge: add brochure items not yet in Supabase (by SKU / name)
+          const existingSkus = new Set(normalized.map(p => (p.sku || '').toUpperCase()));
+          const existingNames = new Set(normalized.map(p => p.name.toLowerCase().trim()));
+          const merged = [...normalized];
+          for (const bp of brochureFallback) {
+            if (
+              !existingSkus.has((bp.sku || '').toUpperCase()) &&
+              !existingNames.has(bp.name.toLowerCase().trim())
+            ) {
+              merged.push(bp);
+            }
+          }
+          return merged;
+        }
+      } catch (err) {
+        console.warn('Supabase products fetch failed, falling back to brochure catalogue:', err);
+      }
+    }
+
+    // Local SQL fallback (dev / offline)
+    try {
+      const rows = await sql`SELECT * FROM products ORDER BY name ASC`;
+      if ((rows as any[]).length > 0) {
+        return (rows as Product[]).filter(p => !isPseudo(p.name));
+      }
+    } catch {
+      // ignore
+    }
+
+    // Last resort: serve brochure directly
+    return brochureFallback;
+  },
+
+  // â”€â”€ SEED CATALOGUE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  /**
+   * Upserts all official course categories + individual pattern items into Supabase.
+   * Removes pseudo-packages and sets the exact category fee to every pattern item.
+   * Returns { categoriesSeeded, productsSeeded, duplicatesRemoved, errors }
+   */
+  async seedCatalog(): Promise<{ categoriesSeeded: number; productsSeeded: number; duplicatesRemoved: number; errors: string[] }> {
+    const errors: string[] = [];
+    let categoriesSeeded = 0;
+    let productsSeeded = 0;
+    let duplicatesRemoved = 0;
+
+    if (!isSupabaseConfigured) {
+      return { categoriesSeeded, productsSeeded, duplicatesRemoved, errors: ['Supabase not configured'] };
+    }
+
+    // 1. Upsert categories
+    const categoryRows = OFFICIAL_COURSE_CATEGORIES
+      .filter(c => c !== 'ALL')
+      .map((name, idx) => ({ name_en: name, name_ta: '', is_active: true, sort_order: idx + 1 }));
+
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .upsert(categoryRows, { onConflict: 'name_en', ignoreDuplicates: false });
+      if (error) errors.push(`Categories: ${error.message}`);
+      else categoriesSeeded = categoryRows.length;
+    } catch (e: any) {
+      errors.push(`Categories exception: ${e?.message}`);
+    }
+
+    // 2. Remove artificial course package pseudo-rows from products & inventory
+    try {
+      const pseudoNames = [
+        'Basics Course', 'Basics Course (Full Package - 2 Months)', 'Basics Course (Full Package)',
+        'Diploma Course', 'Diploma Course (Full Package - 3 Months)', 'Diploma Course (Full Package)',
+        'Fashion Designing Diploma', 'Fashion Designing Diploma (Full Package - 5 Months)', 'Fashion Designing Diploma (Full Package)',
+        'Blouse Only Course', 'Blouse Only Course (Full Package - 1 Month)', 'Blouse Only Course (Full Package)',
+        'Salwar Only Course', 'Salwar Only Course (Full Package - 1 Month)', 'Salwar Only Course (Full Package)'
+      ];
+      await supabase.from('products').delete().in('name', pseudoNames);
+      await supabase.from('products').delete().in('sku', ['BLOUSE-PKG', 'SALWAR-PKG', 'BASICS-PKG', 'DIPLOMA-PKG', 'FD-PKG']);
+      try {
+        await supabase.from('inventory').delete().in('name', pseudoNames);
+      } catch {}
+    } catch (e: any) {
+      errors.push(`Pseudo-package cleanup: ${e?.message}`);
+    }
+
+    // 3. Update existing items in Supabase to official category pricing & duration
+    try {
+      await supabase.from('products').update({ price: 10000, offer_price: 10000, unit_label: '1 Month' }).ilike('category', 'BLOUSE ONLY');
+      await supabase.from('products').update({ price: 10000, offer_price: 10000, unit_label: '1 Month' }).ilike('category', 'SALWAR ONLY');
+      await supabase.from('products').update({ price: 8000, offer_price: 8000, unit_label: '2 Months' }).ilike('category', 'BASICS');
+      await supabase.from('products').update({ price: 25000, offer_price: 25000, unit_label: '3 Months' }).ilike('category', 'DIPLOMA');
+      await supabase.from('products').update({ price: 50000, offer_price: 50000, unit_label: '5 Months' }).ilike('category', 'FASHION DESIGNING DIPLOMA');
+
+      try {
+        await supabase.from('inventory').update({ price: 10000, duration: '1 Month' }).ilike('category', 'BLOUSE ONLY');
+        await supabase.from('inventory').update({ price: 10000, duration: '1 Month' }).ilike('category', 'SALWAR ONLY');
+        await supabase.from('inventory').update({ price: 8000, duration: '2 Months' }).ilike('category', 'BASICS');
+        await supabase.from('inventory').update({ price: 25000, duration: '3 Months' }).ilike('category', 'DIPLOMA');
+        await supabase.from('inventory').update({ price: 50000, duration: '5 Months' }).ilike('category', 'FASHION DESIGNING DIPLOMA');
+      } catch {}
+    } catch (e: any) {
+      errors.push(`Category fee updates: ${e?.message}`);
+    }
+
+    // 4. Deduplicate existing products by SKU / name (keep lowest id)
+    try {
+      const { data: allProds } = await supabase
+        .from('products')
+        .select('id, sku, name')
+        .order('id', { ascending: true });
+
+      if (allProds && allProds.length > 0) {
+        const seenSkus = new Map<string, string>();
+        const seenNames = new Map<string, string>();
+        const toDelete: string[] = [];
+
+        for (const p of allProds) {
+          const skuKey = String(p.sku || '').toUpperCase().trim();
+          const nameKey = String(p.name || '').toLowerCase().trim();
+          const id = String(p.id);
+
+          if (skuKey && seenSkus.has(skuKey)) {
+            toDelete.push(id);
+          } else if (skuKey) {
+            seenSkus.set(skuKey, id);
+          } else if (nameKey && seenNames.has(nameKey)) {
+            toDelete.push(id);
+          } else if (nameKey) {
+            seenNames.set(nameKey, id);
+          }
+        }
+
+        if (toDelete.length > 0) {
+          const { error: delErr } = await supabase
+            .from('products')
+            .delete()
+            .in('id', toDelete);
+          if (!delErr) duplicatesRemoved = toDelete.length;
+          else errors.push(`Dedup: ${delErr.message}`);
+        }
+      }
+    } catch (e: any) {
+      errors.push(`Dedup exception: ${e?.message}`);
+    }
+
+    // 5. Upsert brochure pattern items with exact category fee and duration
+    const productRows = BROCHURE_CATALOGUE_ITEMS.map(item => ({
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      offer_price: item.price,
+      purchase_price: 0,
+      gst_percent: 0,
+      sku: item.id.toUpperCase(),
+      unit: item.unit,
+      unit_label: item.duration,
+      stock_quantity: 999,
+      stock: 999,
+      low_stock_alert: 5,
+      is_active: true,
+      item_type: 'service',
+      description: `${item.category} â€¢ ${item.duration}`,
+    }));
+
+    try {
+      const { error: upsertErr } = await supabase
+        .from('products')
+        .upsert(productRows, { onConflict: 'sku', ignoreDuplicates: false });
+
+      if (upsertErr) {
+        // Fallback: update price where name matches, or insert missing
+        for (const row of productRows) {
+          await supabase
+            .from('products')
+            .update({ price: row.price, offer_price: row.offer_price, unit_label: row.unit_label })
+            .ilike('name', row.name);
+        }
+        productsSeeded = productRows.length;
+      } else {
+        productsSeeded = productRows.length;
+      }
+    } catch (e: any) {
+      errors.push(`Products exception: ${e?.message}`);
+    }
+
+    return { categoriesSeeded, productsSeeded, duplicatesRemoved, errors };
+  },
+
+  async getProduct(id: string): Promise<Product | null> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            name: data.name,
+            description: data.description || null,
+            category: data.category,
+            gst_rate: Number(data.gst_percent || 0),
+            hsn_code: data.barcode || data.sku || null,
+            selling_price: Number(data.offer_price || data.price || 0),
+            sku: data.sku,
+            stock_quantity: Number(data.stock_quantity ?? data.stock ?? 0),
+            low_stock_alert: Number(data.low_stock_alert || 5),
+            purchase_price: Number(data.purchase_price || 0),
+            price: Number(data.price || 0),
+            offer_price: data.offer_price ? Number(data.offer_price) : null,
+            unit: data.unit,
+            unit_label: data.unit_label,
+            item_type: data.item_type,
+            is_active: data.is_active !== false,
+            created_at: data.created_at,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase getProduct failed:', err);
+      }
+    }
+
+    try {
+      const rows = await sql`SELECT * FROM products WHERE id = ${id}`;
+      return rows.length > 0 ? (rows[0] as Product) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async addProduct(input: {
+    name: string;
+    description: string | null;
+    category: string;
+    gst_rate: number;
+    hsn_code: string | null;
+    selling_price: number;
+    sku?: string;
+    stock_quantity?: number;
+    low_stock_alert?: number;
+    purchase_price?: number;
+    item_type?: 'product' | 'service';
+  }): Promise<Product> {
+    const sku = input.sku || `HM-${Date.now().toString().slice(-6)}`;
+    const stockQuantity = Number(input.stock_quantity ?? 999);
+    const lowStockAlert = Number(input.low_stock_alert ?? 5);
+    const purchasePrice = Number(input.purchase_price ?? 0);
+    const sellingPrice = Number(input.selling_price ?? 0);
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .insert({
+            name: input.name,
+            description: input.description || '',
+            category: input.category,
+            price: sellingPrice,
+            offer_price: sellingPrice,
+            purchase_price: purchasePrice,
+            gst_percent: input.gst_rate || 0,
+            sku,
+            stock_quantity: stockQuantity,
+            stock: stockQuantity,
+            low_stock_alert: lowStockAlert,
+            item_type: input.item_type || 'product',
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            name: data.name,
+            description: data.description || null,
+            category: data.category,
+            gst_rate: Number(data.gst_percent || 0),
+            hsn_code: data.sku || null,
+            selling_price: Number(data.price || 0),
+            sku: data.sku,
+            stock_quantity: Number(data.stock_quantity || 0),
+            low_stock_alert: Number(data.low_stock_alert || 5),
+            purchase_price: Number(data.purchase_price || 0),
+            created_at: data.created_at || new Date().toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase addProduct failed:', err);
+      }
+    }
+
+    const id = uid();
+    try {
+      const rows = await sql`
+        INSERT INTO products (id, name, description, category, gst_rate, hsn_code, selling_price)
+        VALUES (
+          ${id}, ${input.name}, ${input.description}, ${input.category},
+          ${input.gst_rate}, ${input.hsn_code || sku}, ${sellingPrice}
+        )
+        RETURNING *
+      `;
+      return rows[0] as Product;
+    } catch {
+      return {
+        id,
+        name: input.name,
+        description: input.description,
+        category: input.category,
+        gst_rate: input.gst_rate,
+        hsn_code: input.hsn_code || sku,
+        selling_price: sellingPrice,
+        sku,
+        stock_quantity: stockQuantity,
+        created_at: new Date().toISOString(),
+      };
+    }
+  },
+
+  async updateProduct(id: string, patch: Partial<Product>): Promise<Product | null> {
+    if (isSupabaseConfigured) {
+      try {
+        const payload: Record<string, any> = {};
+        if (patch.name !== undefined) payload.name = patch.name;
+        if (patch.description !== undefined) payload.description = patch.description;
+        if (patch.category !== undefined) payload.category = patch.category;
+        if (patch.gst_rate !== undefined) payload.gst_percent = patch.gst_rate;
+        if (patch.selling_price !== undefined) {
+          payload.price = patch.selling_price;
+          payload.offer_price = patch.selling_price;
+        }
+        if (patch.sku !== undefined) payload.sku = patch.sku;
+        if (patch.stock_quantity !== undefined) {
+          payload.stock_quantity = patch.stock_quantity;
+          payload.stock = patch.stock_quantity;
+        }
+        if (patch.low_stock_alert !== undefined) payload.low_stock_alert = patch.low_stock_alert;
+        if (patch.purchase_price !== undefined) payload.purchase_price = patch.purchase_price;
+        if (patch.is_active !== undefined) payload.is_active = patch.is_active;
+
+        const { data, error } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            name: data.name,
+            description: data.description || null,
+            category: data.category,
+            gst_rate: Number(data.gst_percent || 0),
+            hsn_code: data.sku,
+            selling_price: Number(data.offer_price || data.price || 0),
+            sku: data.sku,
+            stock_quantity: Number(data.stock_quantity || 0),
+            low_stock_alert: Number(data.low_stock_alert || 5),
+            purchase_price: Number(data.purchase_price || 0),
+            created_at: data.created_at,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase updateProduct failed:', err);
+      }
+    }
+
+    try {
+      if (patch.name !== undefined) await sql`UPDATE products SET name = ${patch.name} WHERE id = ${id}`;
+      if (patch.description !== undefined) await sql`UPDATE products SET description = ${patch.description} WHERE id = ${id}`;
+      if (patch.category !== undefined) await sql`UPDATE products SET category = ${patch.category} WHERE id = ${id}`;
+      if (patch.gst_rate !== undefined) await sql`UPDATE products SET gst_rate = ${patch.gst_rate} WHERE id = ${id}`;
+      if (patch.hsn_code !== undefined) await sql`UPDATE products SET hsn_code = ${patch.hsn_code} WHERE id = ${id}`;
+      if (patch.selling_price !== undefined) await sql`UPDATE products SET selling_price = ${patch.selling_price} WHERE id = ${id}`;
+
+      const rows = await sql`SELECT * FROM products WHERE id = ${id}`;
+      return rows.length > 0 ? (rows[0] as Product) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteProduct(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('products').update({ is_active: false }).eq('id', id);
+        return;
+      } catch (err) {
+        console.warn('Supabase deleteProduct failed:', err);
+      }
+    }
+
+    try {
+      await sql`DELETE FROM products WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  // â”€â”€ INVENTORY ADJUSTMENT & LOGS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async adjustStock(input: {
+    productId: string | number;
+    adjustment: number;
+    reason: string;
+    referenceId?: string;
+    oldQuantity: number;
+    newQuantity: number;
+  }): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        // Update product stock
+        await supabase
+          .from('products')
+          .update({
+            stock_quantity: input.newQuantity,
+            stock: input.newQuantity,
+          })
+          .eq('id', input.productId);
+
+        // Record in inventory_logs
+        await supabase.from('inventory_logs').insert({
+          product_id: input.productId,
+          old_quantity: input.oldQuantity,
+          new_quantity: input.newQuantity,
+          adjustment: input.adjustment,
+          reason: input.reason,
+          reference_id: input.referenceId || null,
+        });
+        return;
+      } catch (err) {
+        console.warn('Supabase adjustStock failed:', err);
+      }
+    }
+
+    try {
+      await sql`UPDATE products SET stock_quantity = ${input.newQuantity} WHERE id = ${String(input.productId)}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  // â”€â”€ CUSTOMERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async upsertCustomer(name: string, phone: string, address?: string | null): Promise<Customer> {
+    const id = uid();
+    try {
+      const rows = await sql`
+        INSERT INTO customers (id, name, phone, address)
+        VALUES (${id}, ${name}, ${phone}, ${address || null})
+        ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address
+        RETURNING *
+      `;
+      return rows[0] as Customer;
+    } catch {
+      return { id, name, phone, address: address || null, created_at: new Date().toISOString() };
+    }
+  },
+
+  // â”€â”€ ORDERS & POS BILLING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async orderIdExists(id: string): Promise<boolean> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('id, invoice_no')
+          .or(keyFilter(id))
+          .limit(1);
+        if (data && data.length > 0) return true;
+      } catch {
+        // fallback
+      }
+    }
+
+    try {
+      const rows = await sql`SELECT 1 FROM orders WHERE id = ${id} LIMIT 1`;
+      return rows.length > 0;
+    } catch {
+      return false;
+    }
+  },
+
+  async listOrdersWithRelations(): Promise<OrderWithRelations[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          // Client-side filter: Exclude active advance orders (PENDING / READY / CANCELLED),
+          // show all regular sales AND advance orders that reached COMPLETED status
+          const visibleOrders = data.filter((o: any) => {
+            const isAdvance = o.is_advance === true || o.order_type === 'ADVANCE';
+            if (!isAdvance) return true; // Standard sale
+            return String(o.status || '').toUpperCase() === 'COMPLETED'; // Completed advance order
+          });
+
+          return visibleOrders.map((o: any) => {
+            let items: any[] = [];
+            if (Array.isArray(o.items)) {
+              items = o.items;
+            } else if (typeof o.items === 'string') {
+              try { items = JSON.parse(o.items); } catch { items = []; }
+            }
+
+            const mappedItems: OrderItemRow[] = items.map((it: any, idx: number) => ({
+              id: String(it.id || `${o.id}-${idx}`),
+              order_id: String(o.id),
+              product_id: it.product_id ? String(it.product_id) : null,
+              snapshot_name: it.name || it.product_name || 'Item',
+              snapshot_price: Number(it.price || it.base_price || it.line_total || 0),
+              quantity: Number(it.quantity || it.qty || 1),
+            }));
+
+            const discount = Number(o.discount_amount ?? o.manual_discount_amount ?? 0);
+            const total = Number(o.total || o.grand_total || 0);
+            const rawSubtotal = Number(o.subtotal || (mappedItems.reduce((sum, it) => sum + (it.snapshot_price * it.quantity), 0)) || total);
+            const isGst = Boolean(
+              Number(o.total_gst || o.gst_amount || 0) > 0 ||
+              o.is_gst ||
+              o.gst_enabled ||
+              (o.gst_enabled == null && o.is_gst == null && total > 0 && rawSubtotal > 0 && total > rawSubtotal)
+            );
+            const gstAmount = Number(
+              o.total_gst ||
+              o.gst_amount ||
+              (isGst && total > rawSubtotal ? total - rawSubtotal : 0)
+            );
+            const subtotal = rawSubtotal > 0 && (rawSubtotal !== total || gstAmount === 0)
+              ? rawSubtotal
+              : (gstAmount > 0 ? total - gstAmount : total);
+            const gstPercentage = Number(
+              o.gst_percentage ||
+              o.gst_rate ||
+              (gstAmount > 0 && subtotal > 0 ? estimateGstPercent(gstAmount, total, o) : (isGst ? 18 : 0))
+            );
+
+            return {
+              id: String(o.id),
+              invoice_no: o.invoice_no || '',
+              invoiceNo: o.invoice_no || '',
+              customer_id: String(o.user_id || o.id),
+              customer_name: o.customer_name || 'Counter Customer',
+              customer_phone: o.phone || '',
+              customer_address: o.address || null,
+              source: (o.order_mode || 'offline').toUpperCase() as 'ONLINE' | 'OFFLINE',
+              status: (o.status || 'COMPLETED').toUpperCase() as 'COMPLETED' | 'PENDING',
+              is_gst: isGst,
+              subtotal,
+              discount_type: String(o.manual_discount_type || '').toLowerCase() === 'percent' && metaToOrderFields(o).fields.manualDiscount !== undefined ? 'PERCENT' : 'FIXED',
+              discount_value: String(o.manual_discount_type || '').toLowerCase() === 'percent' && metaToOrderFields(o).fields.manualDiscount !== undefined ? Number(o.manual_discount_value || 0) : discount,
+              discount_amount: discount,
+              gst_percentage: metaToOrderFields(o).gstPercentage || gstPercentage,
+              gst_amount: gstAmount,
+              delivery_fee: Number(o.delivery_charge || o.delivery_fee || 0),
+              grand_total: total,
+              total,
+              cash_received: Number(o.cash_received ?? (Boolean(o.is_credit) ? 0 : total)),
+              amount_paid: o.amount_paid ?? undefined,
+              balance_due: o.balance_due ?? undefined,
+              due_date: o.credit_due_date || o.due_date || null,
+              split_cash: Number(metaToOrderFields(o).fields.split_cash) || 0,
+              split_gpay: Number(metaToOrderFields(o).fields.split_gpay) || 0,
+              ...metaToOrderFields(o).fields,
+              payment_mode: (String(o.payment_mode || o.payment_method || 'CASH').toUpperCase()) as PaymentMode,
+              bill_date: o.created_at || new Date().toISOString(),
+              created_at: o.created_at || new Date().toISOString(),
+              coupon_code: o.coupon_code || null,
+              remarks: o.remarks || null,
+              reference_number: o.reference_number || null,
+              is_credit: Boolean(o.is_credit || o.payment_mode === 'CREDIT' || o.payment_method === 'credit' || o.credit_status),
+              credit_status: o.credit_status || (o.is_credit || o.payment_mode === 'CREDIT' || o.payment_method === 'credit' ? 'outstanding' : null),
+              credit_due_date: o.credit_due_date || null,
+              credit_paid_at: o.credit_paid_at || null,
+              is_advance: Boolean(o.is_advance || o.order_type === 'ADVANCE'),
+              order_type: o.order_type || null,
+              items: mappedItems,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Supabase orders fetch failed, falling back to local SQL:', err);
+      }
+    }
+
+    try {
+      const orders = await sql`
+        SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE (o.order_type IS NULL OR o.order_type != 'ADVANCE' OR UPPER(o.status) = 'COMPLETED')
+        ORDER BY o.created_at DESC
+      `;
+
+      if (orders.length === 0) return [];
+
+      const orderIds = orders.map((o: any) => o.id);
+      const items = await sql`
+        SELECT * FROM order_items
+        WHERE order_id = ANY(${orderIds})
+      `;
+
+      return orders.map((o: any) => ({
+        ...o,
+        is_advance: Boolean(o.is_advance || o.order_type === 'ADVANCE'),
+        order_type: o.order_type || null,
+        items: items.filter((i: any) => i.order_id === o.id) as OrderItemRow[],
+      })) as OrderWithRelations[];
+    } catch {
+      return [];
+    }
+  },
+
+  async getOrderWithRelations(id: string): Promise<OrderWithRelations | null> {
+    const rawId = decodeURIComponent(String(id || '')).trim();
+    const cleanId = rawId.replace(/^#/, '').trim();
+    const strippedInv = cleanId.replace(/^INV-?/i, '').trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+    const isNumeric = /^\d+$/.test(cleanId);
+
+    if (isSupabaseConfigured) {
+      try {
+        let row: any = null;
+
+        // 1. Exact match on invoice_no
+        if (!row && cleanId) {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('invoice_no', cleanId)
+            .maybeSingle();
+          if (!error && data) row = data;
+        }
+
+        // 2. Try prefix 'INV-' if not present
+        if (!row && cleanId && !cleanId.startsWith('INV-')) {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('invoice_no', `INV-${cleanId}`)
+            .maybeSingle();
+          if (!error && data) row = data;
+        }
+
+        // 3. Try invoice_number or order_number column
+        if (!row && cleanId) {
+          try {
+            const { data } = await supabase
+              .from('orders')
+              .select('*')
+              .or(`invoice_number.eq.${cleanId},order_number.eq.${cleanId}`)
+              .maybeSingle();
+            if (data) row = data;
+          } catch {}
+        }
+
+        // 4. Try UUID match on id column if valid UUID
+        if (!row && isUuid) {
+          const { data } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', cleanId)
+            .maybeSingle();
+          if (data) row = data;
+        }
+
+        // 5. Try numeric match on id column if numeric
+        if (!row && isNumeric) {
+          const { data } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', Number(cleanId))
+            .maybeSingle();
+          if (data) row = data;
+        }
+
+        // 6. Try ilike partial match on invoice_no
+        if (!row && strippedInv) {
+          const { data } = await supabase
+            .from('orders')
+            .select('*')
+            .ilike('invoice_no', `%${strippedInv}%`)
+            .limit(1);
+          if (data && data.length > 0) row = data[0];
+        }
+
+        // 7. Check 'sales' table fallback
+        if (!row) {
+          try {
+            const { data } = await supabase
+              .from('sales')
+              .select('*')
+              .or(`invoice_number.eq.${cleanId},invoice_no.eq.${cleanId},order_number.eq.${cleanId}`)
+              .maybeSingle();
+            if (data) row = data;
+          } catch {}
+        }
+
+        // 8. Check 'advance_orders' table fallback
+        if (!row) {
+          try {
+            const { data } = await supabase
+              .from('advance_orders')
+              .select('*')
+              .or(isUuid ? `id.eq.${cleanId},deposit_id.eq.${cleanId}` : `deposit_id.eq.${cleanId}`)
+              .maybeSingle();
+            if (data) {
+              row = {
+                ...data,
+                invoice_no: data.deposit_id || data.id,
+                is_advance: true,
+                order_type: 'ADVANCE',
+                subtotal: Number(data.subtotal || data.total_amount || 0),
+                total: Number(data.total_amount || 0),
+                grand_total: Number(data.total_amount || 0),
+                deposit_amount: Number(data.deposit_amount || 0),
+                amount_paid: Number(data.deposit_amount || 0),
+                cash_received: Number(data.deposit_amount || 0),
+                balance_due: Math.max(0, Number(data.total_amount || 0) - Number(data.deposit_amount || 0)),
+                created_at: data.created_at || new Date().toISOString(),
+              };
+            }
+          } catch {}
+        }
+
+        if (row) {
+          let items: any[] = [];
+          if (Array.isArray(row.items)) {
+            items = row.items;
+          } else if (typeof row.items === 'string') {
+            try { items = JSON.parse(row.items); } catch { items = []; }
+          }
+
+          // If items are still empty, try querying order_items or advance_order_items table
+          if (items.length === 0 && row.id) {
+            try {
+              const { data: fetchedItems } = await supabase
+                .from('order_items')
+                .select('*')
+                .eq('order_id', row.id);
+              if (fetchedItems && fetchedItems.length > 0) {
+                items = fetchedItems;
+              } else {
+                const { data: advItems } = await supabase
+                  .from('advance_order_items')
+                  .select('*')
+                  .or(`advance_order_id.eq.${row.id},advance_order_id.eq.${cleanId}`);
+                if (advItems && advItems.length > 0) {
+                  items = advItems;
+                }
+              }
+            } catch {}
+          }
+
+          const mappedItems: OrderItemRow[] = items.map((it: any, idx: number) => ({
+            id: String(it.id || `${row.id}-${idx}`),
+            order_id: row.invoice_no || row.invoice_number || String(row.id),
+            product_id: it.product_id ? String(it.product_id) : null,
+            snapshot_name: it.name || it.product_name || it.snapshot_name || 'Item',
+            snapshot_price: Number(it.price || it.base_price || it.selling_price || it.line_total || it.snapshot_price || 0),
+            quantity: Number(it.quantity || it.qty || 1),
+          }));
+
+          const discount = Number(row.discount_amount ?? row.discount ?? row.manual_discount_amount ?? 0);
+          const total = Number(row.total || row.grand_total || row.total_amount || 0);
+          const rawSubtotal = Number(row.subtotal || (mappedItems.reduce((sum, it) => sum + (it.snapshot_price * it.quantity), 0)) || total);
+          const isGst = Boolean(
+            Number(row.total_gst || row.gst_amount || 0) > 0 ||
+            row.is_gst ||
+            row.gst_enabled ||
+            (row.gst_enabled == null && row.is_gst == null && total > 0 && rawSubtotal > 0 && total > rawSubtotal)
+          );
+          const gstAmount = Number(
+            row.total_gst ||
+            row.gst_amount ||
+            (isGst && total > rawSubtotal ? total - rawSubtotal : 0)
+          );
+          const subtotal = rawSubtotal > 0 && (rawSubtotal !== total || gstAmount === 0)
+            ? rawSubtotal
+            : (gstAmount > 0 ? total - gstAmount : total);
+          const gstPercentage = Number(
+            row.gst_percentage ||
+            row.gst_rate ||
+            (gstAmount > 0 && subtotal > 0 ? estimateGstPercent(gstAmount, total, row) : (isGst ? 18 : 0))
+          );
+
+          return {
+            id: row.invoice_no || row.invoice_number || row.order_number || String(row.id),
+            customer_id: String(row.user_id || row.customer_id || row.id),
+            customer_name: row.customer_name || row.customerName || 'Counter Customer',
+            customer_phone: row.phone || row.customer_phone || row.customerPhone || '',
+            customer_address: row.address || row.customer_address || row.customerAddress || null,
+            source: (row.order_mode || row.source || 'offline').toUpperCase() as 'ONLINE' | 'OFFLINE',
+            status: (row.status || 'COMPLETED').toUpperCase() as 'COMPLETED' | 'PENDING',
+            is_gst: isGst,
+            subtotal,
+            discount_type: String(row.manual_discount_type || '').toLowerCase() === 'percent' && metaToOrderFields(row).fields.manualDiscount !== undefined ? 'PERCENT' : 'FIXED',
+            discount_value: String(row.manual_discount_type || '').toLowerCase() === 'percent' && metaToOrderFields(row).fields.manualDiscount !== undefined ? Number(row.manual_discount_value || 0) : discount,
+            discount_amount: discount,
+            gst_percentage: metaToOrderFields(row).gstPercentage || gstPercentage,
+            gst_amount: gstAmount,
+            delivery_fee: Number(row.delivery_charge || row.delivery_fee || 0),
+            grand_total: total,
+            total,
+            cash_received: Number(row.cash_received ?? row.received_amount ?? (Boolean(row.is_credit) ? 0 : total)),
+            amount_paid: row.amount_paid ?? undefined,
+            balance_due: row.balance_due ?? undefined,
+            due_date: row.credit_due_date || row.due_date || null,
+            split_cash: Number(metaToOrderFields(row).fields.split_cash) || 0,
+            split_gpay: Number(metaToOrderFields(row).fields.split_gpay) || 0,
+            ...metaToOrderFields(row).fields,
+            payment_mode: (String(row.payment_mode || row.payment_method || 'CASH').toUpperCase()) as PaymentMode,
+            bill_date: row.billing_date || row.created_at || new Date().toISOString(),
+            created_at: row.created_at || new Date().toISOString(),
+            coupon_code: row.coupon_code || null,
+            remarks: row.notes || row.remarks || null,
+            reference_number: row.reference_number || null,
+            is_credit: Boolean(row.is_credit || row.payment_mode === 'CREDIT' || row.payment_method === 'credit' || row.credit_status),
+            credit_status: row.credit_status || (row.is_credit || row.payment_mode === 'CREDIT' || row.payment_method === 'credit' ? 'outstanding' : null),
+            credit_due_date: row.credit_due_date || null,
+            credit_paid_at: row.credit_paid_at || null,
+            items: mappedItems,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase getOrderWithRelations failed:', err);
+      }
+    }
+
+    try {
+      const orders = await sql`
+        SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+        FROM orders o
+        LEFT JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = ${cleanId} OR o.id = ${rawId}
+      `;
+      if (orders.length === 0) return null;
+
+      const items = await sql`SELECT * FROM order_items WHERE order_id = ${cleanId} OR order_id = ${rawId}`;
+
+      return {
+        ...(orders[0] as any),
+        items: items as OrderItemRow[],
+      } as OrderWithRelations;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteOrder(id: string): Promise<void> {
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      throw new Error('Invalid order ID provided for deletion.');
+    }
+    const cleanId = id.trim();
+    if (isSupabaseConfigured) {
+      // Resolve the genuine primary key first
+      const { data: found, error: findErr } = await supabase
+        .from('orders')
+        .select('id, invoice_no')
+        .or(keyFilter(cleanId));
+      if (findErr) {
+        console.error('deleteOrder lookup failed:', findErr);
+        throw new Error(findErr.message);
+      }
+      const ids = (found || []).map((r: any) => r.id).filter(Boolean);
+      if (ids.length > 0) {
+        // Cascade manually in case FKs lack ON DELETE CASCADE
+        for (const table of ['order_items', 'order_payments', 'payments']) {
+          const col = 'order_id';
+          const vals = ids;
+          if (vals.length === 0) continue;
+          const { error: childErr } = await supabase.from(table).delete().in(col, vals);
+          if (childErr && !/does not exist|schema cache/i.test(childErr.message)) {
+            console.warn(`deleteOrder child cleanup (${table}):`, childErr.message);
+          }
+        }
+        const { data: deleted, error: delErr } = await supabase
+          .from('orders')
+          .delete()
+          .in('id', ids)
+          .select('id');
+        if (delErr) {
+          console.error('deleteOrder failed:', delErr);
+          throw new Error(delErr.message);
+        }
+        if (!deleted || deleted.length === 0) {
+          throw new Error('Delete was blocked (check Supabase RLS DELETE policy on orders).');
+        }
+      } else {
+        // Fallback: try deleting by invoice_no or id directly via keyFilter
+        const { error: fallbackErr } = await supabase
+          .from('orders')
+          .delete()
+          .or(keyFilter(cleanId));
+        if (fallbackErr) {
+          console.error('deleteOrder fallback delete failed:', fallbackErr);
+          throw new Error(fallbackErr.message);
+        }
+      }
+      // Remove matching advance_orders record too
+      const advFilter = isUuid(cleanId) ? `id.eq.${cleanId},deposit_id.eq.${cleanId}` : `deposit_id.eq.${cleanId}`;
+      await supabase.from('advance_orders').delete().or(advFilter);
+      return;
+    }
+
+    try {
+      await sql`DELETE FROM orders WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  async submitOrder(payload: {
+    orderId: string;
+    customerName: string;
+    customerPhone: string;
+    customerAddress?: string | null;
+    source: 'ONLINE' | 'OFFLINE';
+    isGst: boolean;
+    billDate: string;
+    items: CartItem[];
+    discountType: 'PERCENT' | 'FIXED';
+    discountValue: number;
+    discountAmount: number;
+    gstPercentage: number;
+    gstAmount: number;
+    deliveryFee: number;
+    grandTotal: number;
+    cashReceived: number;
+    splitCash?: number;
+    splitGpay?: number;
+    paymentMode: PaymentMode;
+    couponCode?: string | null;
+    manualDiscountAmount?: number;
+    couponDiscountAmount?: number;
+    taxMode?: 'exclusive' | 'inclusive';
+    advancePaidEarlier?: number;
+    advanceMode?: string;
+    advanceCash?: number;
+    advanceGpay?: number;
+    settlePayment?: { mode: 'CASH' | 'GPAY' | 'SPLIT'; cash: number; gpay: number; amount: number; at?: string };
+    remarks?: string | null;
+    referenceNumber?: string | null;
+    creditDueDate?: string | null;
+  }): Promise<{ orderId: string; id?: string; invoiceNo?: string }> {
+    const formattedInvoiceNo = payload.orderId.startsWith('INV') ? payload.orderId : `INV-${payload.orderId}`;
+    const isCredit = payload.paymentMode === 'CREDIT';
+    const isGst = Boolean(payload.isGst || (payload.gstAmount && payload.gstAmount > 0));
+    const itemsSubtotal = payload.items.reduce((sum, it) => sum + (it.price * it.qty), 0);
+    const baseSubtotal = itemsSubtotal > 0 ? itemsSubtotal : (payload.grandTotal - (isGst ? payload.gstAmount : 0) - payload.deliveryFee + payload.discountAmount);
+
+    const structuredItems = payload.items.map((it) => ({
+      product_id: it.product_id || null,
+      name: it.name,
+      quantity: it.qty,
+      unit: it.unit || 'piece',
+      base_price: it.price,
+      line_total: it.price * it.qty,
+      sku: it.sku || null,
+    }));
+
+    if (isSupabaseConfigured) {
+      try {
+        let createdAtIso = new Date().toISOString();
+        if (payload.billDate) {
+          try {
+            const d = new Date(payload.billDate.includes('T') ? payload.billDate : `${payload.billDate}T12:00:00Z`);
+            if (!isNaN(d.getTime())) {
+              createdAtIso = d.toISOString();
+            }
+          } catch {
+            createdAtIso = new Date().toISOString();
+          }
+        }
+
+        const orderRow: Record<string, any> = {
+          invoice_no: formattedInvoiceNo,
+          customer_name: payload.customerName.trim() || 'Counter Customer',
+          phone: payload.customerPhone.trim() || '',
+          address: payload.customerAddress?.trim() || '',
+          order_mode: (payload.source || 'OFFLINE').toLowerCase(),
+          order_type: 'pos_sale',
+          status: isCredit ? 'PENDING' : 'COMPLETED',
+          subtotal: baseSubtotal,
+          total: payload.grandTotal,
+          discount_amount: payload.discountAmount,
+          manual_discount_amount: Number(payload.manualDiscountAmount) || 0,
+          manual_discount_type: payload.discountType === 'PERCENT' ? 'percent' : 'flat',
+          manual_discount_value: payload.discountValue || 0,
+          gst_enabled: isGst,
+          total_gst: isGst ? payload.gstAmount : 0,
+          gst_amount: isGst ? payload.gstAmount : 0,
+          delivery_charge: payload.deliveryFee,
+          payment_mode: payload.paymentMode,
+          payment_method: isCredit ? 'CREDIT' : payload.paymentMode,
+          cash_received: Number(payload.cashReceived) || 0,
+          amount_paid: isCredit ? (Number(payload.cashReceived) || 0) : payload.grandTotal,
+          balance_due: isCredit ? Math.max(0, payload.grandTotal - (Number(payload.cashReceived) || 0)) : 0,
+          due_date: isCredit ? (payload.creditDueDate || null) : null,
+          credit_due_date: isCredit ? (payload.creditDueDate || null) : null,
+          split_details: buildSplitDetails({
+            cash: payload.paymentMode === 'SPLIT' ? Number(payload.splitCash) || 0 : undefined,
+            gpay: payload.paymentMode === 'SPLIT' ? Number(payload.splitGpay) || 0 : undefined,
+            gstPercentage: isGst ? Number(payload.gstPercentage) || 0 : 0,
+            manualDiscount: payload.manualDiscountAmount !== undefined ? Number(payload.manualDiscountAmount) || 0 : Number(payload.discountAmount) || 0,
+            couponDiscount: Number(payload.couponDiscountAmount) || 0,
+            taxMode: payload.taxMode,
+            advancePaid: payload.advancePaidEarlier,
+            advanceMode: payload.advanceMode,
+            advanceCash: payload.advanceCash,
+            advanceGpay: payload.advanceGpay,
+            settle: payload.settlePayment,
+          }),
+          coupon_code: payload.couponCode || null,
+          items: structuredItems,
+          notes: payload.remarks || null,
+          reference_number: payload.referenceNumber || null,
+          is_credit: isCredit,
+          credit_status: isCredit ? 'outstanding' : null,
+          created_at: createdAtIso,
+        };
+
+        let { data, error } = await supabase
+          .from('orders')
+          .insert(orderRow)
+          .select()
+          .single();
+
+        if (error && (error.code === 'PGRST204' || /amount_paid|balance_due|is_advance/i.test(error.message))) {
+          const { amount_paid, balance_due, is_advance, ...safeRow } = orderRow;
+          const retry = await supabase
+            .from('orders')
+            .insert(safeRow)
+            .select()
+            .single();
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          console.error('Supabase submitOrder insert error:', error.message, error.details);
+          throw new Error(error.message);
+        }
+
+        if (isCredit && data) {
+          if (data.total == null || data.balance_due == null || !data.customer_name) {
+            console.error('Integrity check failed for credit order insert:', data);
+            throw new Error('Credit order failed integrity validation on returned database row');
+          }
+        }
+
+        if (!error && data) {
+          // Record order items in order_items table
+          try {
+            await Promise.all(
+              structuredItems.map((item) =>
+                supabase.from('order_items').insert({
+                  order_id: data.id,
+                  product_name: item.name,
+                  name: item.name,
+                  quantity: item.quantity,
+                  unit: item.unit || 'piece',
+                  base_price: item.base_price,
+                  line_total: item.line_total,
+                })
+              )
+            );
+          } catch {
+            // non-fatal
+          }
+
+          // Atomically decrement stock if product_id exists
+          for (const item of payload.items) {
+            if (item.product_id) {
+              try {
+                const { data: prod } = await supabase.from('products').select('stock_quantity').eq('id', item.product_id).single();
+                if (prod) {
+                  const newQty = Math.max(0, Number(prod.stock_quantity || 0) - item.qty);
+                  await supabase.from('products').update({ stock_quantity: newQty, stock: newQty }).eq('id', item.product_id);
+                  await supabase.from('inventory_logs').insert({
+                    product_id: item.product_id,
+                    old_quantity: prod.stock_quantity,
+                    new_quantity: newQty,
+                    adjustment: -item.qty,
+                    reason: 'sale',
+                    reference_id: formattedInvoiceNo,
+                  });
+                }
+              } catch {
+                // non-fatal
+              }
+            }
+          }
+
+          return {
+            orderId: data.invoice_no || formattedInvoiceNo,
+            id: data.id,
+            invoiceNo: data.invoice_no || formattedInvoiceNo,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase submitOrder failed, trying SQL fallback:', err);
+      }
+    }
+
+    // Local SQL Fallback
+    try {
+      const customer = await this.upsertCustomer(
+        payload.customerName,
+        payload.customerPhone,
+        payload.customerAddress,
+      );
+
+      await sql`
+        INSERT INTO orders (
+          id, customer_id, source, status, is_gst, subtotal, discount_type, discount_value,
+          discount_amount, gst_percentage, gst_amount, delivery_fee, grand_total,
+          cash_received, split_cash, split_gpay, payment_mode, bill_date, created_at,
+          is_credit, credit_status, credit_due_date
+        ) VALUES (
+          ${payload.orderId}, ${customer.id}, ${payload.source}, ${isCredit ? 'PENDING' : 'COMPLETED'}, ${payload.isGst},
+          ${baseSubtotal},
+          ${payload.discountType}, ${payload.discountValue}, ${payload.discountAmount},
+          ${payload.gstPercentage}, ${payload.gstAmount}, ${payload.deliveryFee},
+          ${payload.grandTotal}, ${payload.cashReceived},
+          ${payload.splitCash ?? 0}, ${payload.splitGpay ?? 0},
+          ${payload.paymentMode}, ${payload.billDate}, now(),
+          ${isCredit}, ${isCredit ? 'outstanding' : null}, ${isCredit ? (payload.creditDueDate || null) : null}
+        )
+      `;
+
+      await Promise.all(
+        payload.items.map((oi) =>
+          sql`
+            INSERT INTO order_items (
+              id, order_id, product_id, snapshot_name, snapshot_price, quantity
+            ) VALUES (
+              ${uid()}, ${payload.orderId}, ${oi.product_id},
+              ${oi.name}, ${oi.price}, ${oi.qty}
+            )
+          `
+        ),
+      );
+    } catch {
+      // ignore
+    }
+
+    return { orderId: payload.orderId };
+  },
+
+  // â”€â”€ EXPENSES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async listExpenses(): Promise<Expense[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*, expense_categories(name)')
+          .order('expense_date', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          return data.map((e: any) => ({
+            id: String(e.id),
+            title: e.description || e.expense_categories?.name || 'Expense',
+            category: e.expense_categories?.name || 'General',
+            amount: Number(e.amount || 0),
+            payment_mode: 'CASH',
+            notes: e.description || null,
+            expense_date: e.expense_date ? String(e.expense_date).split('T')[0] : new Date().toISOString().split('T')[0],
+            created_at: e.created_at || new Date().toISOString(),
+          }));
+        }
+      } catch (err) {
+        console.warn('Supabase listExpenses failed:', err);
+      }
+    }
+
+    try {
+      const rows = await sql`
+        SELECT * FROM expenses
+        ORDER BY expense_date DESC, created_at DESC
+      `;
+      return rows as Expense[];
+    } catch {
+      return [];
+    }
+  },
+
+  async addExpense(input: {
+    id?: string;
+    title: string;
+    category: string;
+    amount: number;
+    payment_mode: string;
+    notes: string | null;
+    expense_date: string;
+  }): Promise<Expense> {
+    const id = input.id || uid();
+    if (isSupabaseConfigured) {
+      try {
+        // Find or create category
+        let categoryId = 1;
+        const categoryName = input.category.trim() || 'General';
+        const { data: catData } = await supabase
+          .from('expense_categories')
+          .select('id')
+          .ilike('name', categoryName)
+          .maybeSingle();
+
+        if (catData) {
+          categoryId = catData.id;
+        } else {
+          const { data: newCat, error: newCatErr } = await supabase
+            .from('expense_categories')
+            .insert({ name: categoryName })
+            .select('id')
+            .maybeSingle();
+          if (newCat) categoryId = newCat.id;
+        }
+
+        const { data, error } = await supabase
+          .from('expenses')
+          .insert({
+            id,
+            category_id: categoryId,
+            amount: input.amount,
+            description: input.notes ? `${input.title} - ${input.notes}` : input.title,
+            expense_date: input.expense_date,
+          })
+          .select('*, expense_categories(name)')
+          .maybeSingle();
+
+        if (!error && data) {
+          return {
+            id: String(data.id),
+            title: input.title,
+            category: data.expense_categories?.name || categoryName,
+            amount: Number(data.amount),
+            payment_mode: input.payment_mode || 'CASH',
+            notes: input.notes,
+            expense_date: input.expense_date,
+            created_at: data.created_at || new Date().toISOString(),
+          };
+        }
+
+        if (error) {
+          // Handle 23505 unique constraint violation gracefully (idempotency conflict)
+          if (error.code === '23505') {
+            const { data: existing } = await supabase
+              .from('expenses')
+              .select('*, expense_categories(name)')
+              .eq('id', id)
+              .maybeSingle();
+            if (existing) {
+              return {
+                id: String(existing.id),
+                title: input.title,
+                category: existing.expense_categories?.name || categoryName,
+                amount: Number(existing.amount),
+                payment_mode: input.payment_mode || 'CASH',
+                notes: input.notes,
+                expense_date: existing.expense_date ? String(existing.expense_date).split('T')[0] : input.expense_date,
+                created_at: existing.created_at || new Date().toISOString(),
+              };
+            }
+          }
+          throw error;
+        }
+      } catch (err) {
+        console.warn('Supabase addExpense failed:', err);
+      }
+    }
+
+    try {
+      const rows = await sql`
+        INSERT INTO expenses (id, title, category, amount, payment_mode, notes, expense_date)
+        VALUES (
+          ${id}, ${input.title}, ${input.category}, ${input.amount},
+          ${input.payment_mode}, ${input.notes}, ${input.expense_date}
+        )
+        RETURNING *
+      `;
+      return rows[0] as Expense;
+    } catch {
+      return {
+        id,
+        title: input.title,
+        category: input.category,
+        amount: input.amount,
+        payment_mode: input.payment_mode,
+        notes: input.notes,
+        expense_date: input.expense_date,
+        created_at: new Date().toISOString(),
+      };
+    }
+  },
+
+  async updateExpense(id: string, patch: Partial<Expense>): Promise<Expense | null> {
+    if (isSupabaseConfigured) {
+      try {
+        const payload: Record<string, any> = {
+          updated_at: new Date().toISOString(),
+        };
+        if (patch.amount !== undefined) payload.amount = Number(patch.amount);
+        if (patch.expense_date !== undefined) payload.expense_date = patch.expense_date;
+        if (patch.title !== undefined || patch.notes !== undefined) {
+          payload.description = patch.notes ? `${patch.title || ''} - ${patch.notes}`.trim() : (patch.title || '').trim();
+        }
+
+        if (patch.category !== undefined && patch.category.trim()) {
+          const categoryName = patch.category.trim();
+          const { data: catData } = await supabase
+            .from('expense_categories')
+            .select('id')
+            .ilike('name', categoryName)
+            .maybeSingle();
+
+          if (catData) {
+            payload.category_id = catData.id;
+          } else {
+            const { data: newCat } = await supabase
+              .from('expense_categories')
+              .insert({ name: categoryName })
+              .select('id')
+              .maybeSingle();
+            if (newCat) payload.category_id = newCat.id;
+          }
+        }
+
+        const { data, error } = await supabase
+          .from('expenses')
+          .update(payload)
+          .eq('id', id)
+          .select('*, expense_categories(name)')
+          .maybeSingle();
+
+        if (error) {
+          throw new Error(error.message ?? 'Update failed');
+        }
+
+        if (data) {
+          return {
+            id: String(data.id),
+            title: patch.title !== undefined ? patch.title : (data.description || data.expense_categories?.name || 'Expense'),
+            category: data.expense_categories?.name || patch.category || 'General',
+            amount: Number(data.amount || 0),
+            payment_mode: patch.payment_mode || 'CASH',
+            notes: patch.notes !== undefined ? patch.notes : (data.description || null),
+            expense_date: data.expense_date ? String(data.expense_date).split('T')[0] : (patch.expense_date || new Date().toISOString().split('T')[0]),
+            created_at: data.created_at || new Date().toISOString(),
+          };
+        }
+      } catch (err: any) {
+        console.warn('Supabase updateExpense failed:', err);
+        throw err;
+      }
+    }
+
+    try {
+      if (patch.title !== undefined) await sql`UPDATE expenses SET title = ${patch.title} WHERE id = ${id}`;
+      if (patch.category !== undefined) await sql`UPDATE expenses SET category = ${patch.category} WHERE id = ${id}`;
+      if (patch.amount !== undefined) await sql`UPDATE expenses SET amount = ${patch.amount} WHERE id = ${id}`;
+      if (patch.payment_mode !== undefined) await sql`UPDATE expenses SET payment_mode = ${patch.payment_mode} WHERE id = ${id}`;
+      if (patch.notes !== undefined) await sql`UPDATE expenses SET notes = ${patch.notes} WHERE id = ${id}`;
+      if (patch.expense_date !== undefined) await sql`UPDATE expenses SET expense_date = ${patch.expense_date} WHERE id = ${id}`;
+
+      const rows = await sql`SELECT * FROM expenses WHERE id = ${id}`;
+      return rows.length > 0 ? (rows[0] as Expense) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async deleteExpense(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .delete()
+          .eq('id', id)
+          .select('id');
+
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) {
+          throw new Error('Delete affected 0 rows');
+        }
+        return;
+      } catch (err: any) {
+        console.warn('Supabase deleteExpense failed:', err);
+        throw err;
+      }
+    }
+
+    try {
+      await sql`DELETE FROM expenses WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  // â”€â”€ ADVANCE ORDERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async listAdvanceOrders(): Promise<AdvanceOrderWithRelations[]> {
+
+
+    if (isSupabaseConfigured) {
+      const results: AdvanceOrderWithRelations[] = [];
+      const seenIds = new Set<string>();
+
+      // 1. Fetch matching orders to enrich advance_orders breakdown
+      const ordMap = new Map<string, any>();
+      let ordDataList: any[] = [];
+      try {
+        const { data: ordData } = await supabase
+          .from('orders')
+          .select('*')
+          .or('order_type.eq.ADVANCE,order_type.eq.advance,invoice_no.ilike.DEP-%')
+          .order('created_at', { ascending: false });
+        if (ordData && ordData.length > 0) {
+          ordDataList = ordData;
+          for (const o of ordData) {
+            if (o.invoice_no) ordMap.set(o.invoice_no, o);
+            if (o.id) ordMap.set(String(o.id), o);
+            if (o.reference_number) ordMap.set(o.reference_number, o);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase orders fetch error in listAdvanceOrders:', err);
+      }
+
+      // 2. Read from dedicated advance_orders table
+      try {
+        const { data, error } = await supabase
+          .from('advance_orders')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          for (const a of data) {
+            const advId = a.deposit_id || a.depositId || String(a.id);
+            // Track both the logical ID and raw row ID for dedup below
+            seenIds.add(advId);
+            if (a.deposit_id) seenIds.add(String(a.id));
+
+            const matchedOrd = ordMap.get(advId) || ordMap.get(String(a.id)) || (a.deposit_id ? ordMap.get(a.deposit_id) : null);
+
+            let parsedItems: any[] = [];
+            if (Array.isArray(a.products) && a.products.length > 0) {
+              parsedItems = a.products;
+            } else if (typeof a.products === 'string' && a.products.trim()) {
+              try { parsedItems = JSON.parse(a.products); } catch {}
+            } else if (matchedOrd && Array.isArray(matchedOrd.items) && matchedOrd.items.length > 0) {
+              parsedItems = matchedOrd.items;
+            }
+
+            const items: AdvanceOrderItemRow[] = parsedItems.length > 0
+              ? parsedItems.map((it: any, idx: number) => ({
+                  id: String(it.id || `${a.id}-item-${idx}`),
+                  advance_order_id: advId,
+                  product_id: it.product_id ? String(it.product_id) : null,
+                  snapshot_name: it.name || it.product_name || it.snapshot_name || 'Tailoring Item',
+                  snapshot_desc: it.desc || it.snapshot_desc || null,
+                  snapshot_price: Number(it.price || it.snapshot_price || 0),
+                  quantity: Number(it.qty || it.quantity || 1),
+                }))
+              : [
+                  {
+                    id: `${a.id}-item`,
+                    advance_order_id: advId,
+                    product_id: a.product_id ? String(a.product_id) : null,
+                    snapshot_name: a.product_name || 'Tailoring Item',
+                    snapshot_desc: a.description || null,
+                    snapshot_price: Number(a.total_amount || 0),
+                    quantity: 1,
+                  },
+                ];
+
+            const totalAmt = Number(matchedOrd?.total || matchedOrd?.grand_total || a.total_amount || 0);
+            const depAmt = Number(matchedOrd?.amount_paid || matchedOrd?.cash_received || a.deposit_amount || 0);
+            const rawSubtotal = Number(matchedOrd?.subtotal || (items.reduce((sum, it) => sum + (it.snapshot_price * it.quantity), 0)) || totalAmt);
+            const isGst = Boolean(
+              matchedOrd?.gst_enabled ||
+              matchedOrd?.is_gst ||
+              Number(matchedOrd?.total_gst || matchedOrd?.gst_amount || 0) > 0 ||
+              (matchedOrd?.gst_enabled == null && matchedOrd?.is_gst == null && totalAmt > 0 && rawSubtotal > 0 && totalAmt > rawSubtotal)
+            );
+            const gstAmount = Number(
+              matchedOrd?.total_gst ||
+              matchedOrd?.gst_amount ||
+              (isGst && totalAmt > rawSubtotal ? totalAmt - rawSubtotal : 0)
+            );
+            const subtotal = rawSubtotal > 0 && (rawSubtotal !== totalAmt || gstAmount === 0)
+              ? rawSubtotal
+              : (gstAmount > 0 ? totalAmt - gstAmount : totalAmt);
+            const gstPercentage = Number(
+              metaToOrderFields(matchedOrd).gstPercentage ||
+              matchedOrd?.gst_percentage ||
+              matchedOrd?.gst_rate ||
+              (gstAmount > 0 && subtotal > 0 ? estimateGstPercent(gstAmount, totalAmt, matchedOrd) : (isGst ? 18 : 0))
+            );
+            const discountAmount = Number(matchedOrd?.discount_amount ?? matchedOrd?.manual_discount_amount ?? 0);
+            const discountValue = Number(matchedOrd?.manual_discount_value || matchedOrd?.discount_value || 0);
+            const discountType = matchedOrd?.manual_discount_type === 'percent' ? 'PERCENT' : 'FIXED';
+            const deliveryFee = Number(matchedOrd?.delivery_charge || matchedOrd?.delivery_fee || 0);
+            const balDue = Number(matchedOrd?.balance_due ?? Math.max(0, totalAmt - depAmt));
+
+            results.push({
+              id: advId,
+              customer_id: String(a.id),
+              customer_name: a.customer_name || matchedOrd?.customer_name || 'Customer',
+              customer_phone: a.phone || a.customer_phone || matchedOrd?.phone || '',
+              customer_address: a.address || a.customer_address || matchedOrd?.address || null,
+              status: (a.status === 'completed' || matchedOrd?.status === 'COMPLETED') ? 'COMPLETED' : mapStatus(a.status),
+              subtotal,
+              total_amount: totalAmt,
+              total: totalAmt,
+              grand_total: totalAmt,
+              deposit_amount: depAmt,
+              deposit_payment_mode: (String(matchedOrd?.payment_mode || 'CASH').toUpperCase()) as PaymentMode,
+              ...({ payment_mode: String(matchedOrd?.payment_mode || 'CASH').toUpperCase() } as Record<string, any>),
+              delivery_date: a.expected_delivery_date || a.delivery_date || matchedOrd?.delivery_date || null,
+              notes: a.remarks || a.notes || a.description || matchedOrd?.notes || null,
+              finalized_order_id: matchedOrd?.reference_number || a.invoice_number || a.completed_order_id || null,
+              finalized_at: a.completed_at || matchedOrd?.created_at || null,
+              cancelled_at: null,
+              created_at: a.created_at || new Date().toISOString(),
+              is_gst: isGst,
+              gst_percentage: gstPercentage,
+              gst_amount: gstAmount,
+              discount_amount: discountAmount,
+              discount_type: discountType,
+              discount_value: discountValue,
+              delivery_fee: deliveryFee,
+              amount_paid: depAmt,
+              balance_due: balDue,
+              ...metaToOrderFields(matchedOrd).fields,
+              ...({ credit_paid_at: matchedOrd?.credit_paid_at || a.completed_at || null } as Record<string, any>),
+              items,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase advance_orders query failed:', err);
+      }
+
+      // 3. Add any orders from orders table not yet seen
+      for (const o of ordDataList) {
+        const advId = o.invoice_no || String(o.id);
+        if (seenIds.has(advId) || seenIds.has(String(o.id))) continue;
+        seenIds.add(advId);
+
+        let orderItems: any[] = [];
+        if (Array.isArray(o.items)) orderItems = o.items;
+        else if (typeof o.items === 'string') {
+          try { orderItems = JSON.parse(o.items); } catch {}
+        }
+
+        const items: AdvanceOrderItemRow[] = orderItems.map((it: any, idx: number) => ({
+          id: String(it.id || `${o.id}-item-${idx}`),
+          advance_order_id: advId,
+          product_id: it.product_id ? String(it.product_id) : null,
+          snapshot_name: it.name || it.product_name || 'Tailoring Item',
+          snapshot_desc: it.desc || null,
+          snapshot_price: Number(it.price || it.base_price || 0),
+          quantity: Number(it.quantity || it.qty || 1),
+        }));
+
+        const totalAmt = Number(o.total || o.grand_total || o.total_amount || 0);
+        const depAmt = Number(o.amount_paid || o.cash_received || o.deposit_amount || 0);
+        const rawSubtotal = Number(o.subtotal || (items.reduce((sum, it) => sum + (it.snapshot_price * it.quantity), 0)) || totalAmt);
+        const isGst = Boolean(
+          o.gst_enabled ||
+          o.is_gst ||
+          Number(o.total_gst || o.gst_amount || 0) > 0 ||
+          (o.gst_enabled == null && o.is_gst == null && totalAmt > 0 && rawSubtotal > 0 && totalAmt > rawSubtotal)
+        );
+        const gstAmount = Number(
+          o.total_gst ||
+          o.gst_amount ||
+          (isGst && totalAmt > rawSubtotal ? totalAmt - rawSubtotal : 0)
+        );
+        const subtotal = rawSubtotal > 0 && (rawSubtotal !== totalAmt || gstAmount === 0)
+          ? rawSubtotal
+          : (gstAmount > 0 ? totalAmt - gstAmount : totalAmt);
+        const gstPercentage = Number(
+          metaToOrderFields(o).gstPercentage ||
+          o.gst_percentage ||
+          o.gst_rate ||
+          (gstAmount > 0 && subtotal > 0 ? estimateGstPercent(gstAmount, totalAmt, o) : (isGst ? 18 : 0))
+        );
+        const discountAmount = Number(o.discount_amount ?? o.manual_discount_amount ?? 0);
+        const discountValue = Number(o.manual_discount_value || o.discount_value || 0);
+        const discountType = o.manual_discount_type === 'percent' ? 'PERCENT' : 'FIXED';
+        const deliveryFee = Number(o.delivery_charge || o.delivery_fee || 0);
+
+        results.push({
+          id: advId,
+          customer_id: String(o.user_id || o.id),
+          customer_name: o.customer_name || 'Customer',
+          customer_phone: o.phone || o.customer_phone || '',
+          customer_address: o.address || null,
+          status: mapStatus(o.status),
+          subtotal,
+          total_amount: totalAmt,
+          total: totalAmt,
+          grand_total: totalAmt,
+          deposit_amount: depAmt,
+          deposit_payment_mode: (String(o.payment_mode || 'CASH').toUpperCase()) as PaymentMode,
+          ...({ payment_mode: String(o.payment_mode || 'CASH').toUpperCase() } as Record<string, any>),
+          delivery_date: o.delivery_date || o.expected_delivery_date || null,
+          notes: o.notes || o.remarks || null,
+          finalized_order_id: null,
+          finalized_at: null,
+          cancelled_at: null,
+          created_at: o.created_at || new Date().toISOString(),
+          is_gst: isGst,
+          gst_percentage: gstPercentage,
+          gst_amount: gstAmount,
+          discount_amount: discountAmount,
+          discount_type: discountType,
+          discount_value: discountValue,
+          delivery_fee: deliveryFee,
+          amount_paid: depAmt,
+          balance_due: Number(o.balance_due ?? Math.max(0, totalAmt - depAmt)),
+          ...metaToOrderFields(o).fields,
+          ...({ credit_paid_at: o.credit_paid_at || null } as Record<string, any>),
+          items: items.length > 0 ? items : [{
+            id: `${o.id}-item`,
+            advance_order_id: advId,
+            product_id: null,
+            snapshot_name: 'Tailoring Item',
+            snapshot_desc: null,
+            snapshot_price: totalAmt,
+            quantity: 1,
+          }],
+        });
+      }
+
+      return results;
+    }
+
+    try {
+      const rows = await sql`
+        SELECT a.*, c.name AS customer_name, c.phone AS customer_phone, c.address AS customer_address
+        FROM advance_orders a
+        JOIN customers c ON c.id = a.customer_id
+        ORDER BY a.created_at DESC
+      `;
+      if (rows.length === 0) return [];
+
+      const ids = rows.map((r: any) => r.id);
+      const items = await sql`
+        SELECT * FROM advance_order_items WHERE advance_order_id = ANY(${ids})
+      `;
+
+      return rows.map((r: any) => ({
+        ...r,
+        items: (items as AdvanceOrderItemRow[]).filter((i) => i.advance_order_id === r.id),
+      })) as AdvanceOrderWithRelations[];
+    } catch {
+      return [];
+    }
+  },
+
+  async getAdvanceOrder(id: string): Promise<AdvanceOrderWithRelations | null> {
+    const rawId = decodeURIComponent(String(id || '')).trim();
+    const cleanId = rawId.replace(/^#/, '').trim();
+    const list = await this.listAdvanceOrders();
+    const found = list.find(
+      (a) =>
+        a.id === cleanId ||
+        a.id === rawId ||
+        a.id.replace(/^#/, '') === cleanId ||
+        (a as any).deposit_id === cleanId ||
+        (a as any).customer_id === cleanId
+    );
+    if (!found && isSupabaseConfigured) {
+      try {
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('*')
+          .or(isUuid(cleanId) ? `id.eq.${cleanId},invoice_no.eq.${cleanId}` : `invoice_no.eq.${cleanId}`)
+          .maybeSingle();
+        if (ord) {
+          const totalAmt = Number(ord.total || ord.grand_total || ord.total_amount || 0);
+          const depAmt = Number(ord.amount_paid || ord.cash_received || ord.deposit_amount || 0);
+          let orderItems: any[] = [];
+          if (Array.isArray(ord.items)) orderItems = ord.items;
+          else if (typeof ord.items === 'string') {
+            try { orderItems = JSON.parse(ord.items); } catch {}
+          }
+          const mappedAdvItems: AdvanceOrderItemRow[] = orderItems.map((it: any, idx: number) => ({
+            id: String(it.id || `${ord.id}-item-${idx}`),
+            advance_order_id: ord.invoice_no || String(ord.id),
+            product_id: it.product_id ? String(it.product_id) : null,
+            snapshot_name: it.name || it.product_name || 'Tailoring Item',
+            snapshot_desc: it.desc || null,
+            snapshot_price: Number(it.price || it.base_price || 0),
+            quantity: Number(it.quantity || it.qty || 1),
+          }));
+
+          const rawSubtotal = Number(ord.subtotal || (mappedAdvItems.reduce((sum: number, it: any) => sum + (it.snapshot_price * it.quantity), 0)) || totalAmt);
+          const isGst = Boolean(
+            ord.gst_enabled ||
+            ord.is_gst ||
+            Number(ord.total_gst || ord.gst_amount || 0) > 0 ||
+            (ord.gst_enabled == null && ord.is_gst == null && totalAmt > 0 && rawSubtotal > 0 && totalAmt > rawSubtotal)
+          );
+          const gstAmount = Number(
+            ord.total_gst ||
+            ord.gst_amount ||
+            (isGst && totalAmt > rawSubtotal ? totalAmt - rawSubtotal : 0)
+          );
+          const subtotal = rawSubtotal > 0 && (rawSubtotal !== totalAmt || gstAmount === 0)
+            ? rawSubtotal
+            : (gstAmount > 0 ? totalAmt - gstAmount : totalAmt);
+          const gstPercentage = Number(
+            metaToOrderFields(ord).gstPercentage ||
+            ord.gst_percentage ||
+            ord.gst_rate ||
+            (gstAmount > 0 && subtotal > 0 ? estimateGstPercent(gstAmount, totalAmt, ord) : (isGst ? 18 : 0))
+          );
+
+          return {
+            id: ord.invoice_no || String(ord.id),
+            customer_id: String(ord.user_id || ord.id),
+            customer_name: ord.customer_name || 'Customer',
+            customer_phone: ord.phone || '',
+            customer_address: ord.address || null,
+            status: mapStatus(ord.status),
+            subtotal,
+            total_amount: totalAmt,
+            total: totalAmt,
+            grand_total: totalAmt,
+            deposit_amount: depAmt,
+            deposit_payment_mode: (String(ord.payment_mode || 'CASH').toUpperCase()) as PaymentMode,
+            ...({ payment_mode: String(ord.payment_mode || 'CASH').toUpperCase() } as Record<string, any>),
+            delivery_date: ord.delivery_date || ord.expected_delivery_date || null,
+            notes: ord.notes || null,
+            finalized_order_id: null,
+            finalized_at: null,
+            cancelled_at: null,
+            created_at: ord.created_at || new Date().toISOString(),
+            is_gst: isGst,
+            gst_percentage: gstPercentage,
+            gst_amount: gstAmount,
+            discount_amount: Number(ord.discount_amount ?? ord.manual_discount_amount ?? 0),
+            discount_type: ord.manual_discount_type === 'percent' ? 'PERCENT' : 'FIXED',
+            discount_value: Number(ord.manual_discount_value || 0),
+            delivery_fee: Number(ord.delivery_charge || ord.delivery_fee || 0),
+            amount_paid: depAmt,
+            balance_due: Number(ord.balance_due ?? Math.max(0, totalAmt - depAmt)),
+            ...metaToOrderFields(ord).fields,
+            credit_paid_at: ord.credit_paid_at || null,
+            items: mappedAdvItems.length > 0 ? mappedAdvItems : [{
+              id: `${ord.id}-item`,
+              advance_order_id: ord.invoice_no || String(ord.id),
+              product_id: null,
+              snapshot_name: 'Tailoring Item',
+              snapshot_desc: null,
+              snapshot_price: totalAmt,
+              quantity: 1,
+            }],
+          } as any;
+        }
+      } catch {}
+    }
+    return found || null;
+  },
+
+  async advanceOrderIdExists(id: string): Promise<boolean> {
+    const order = await this.getAdvanceOrder(id);
+    return !!order;
+  },
+
+  async createAdvanceOrder(payload: {
+    advanceOrderId: string;
+    customerName: string;
+    customerPhone: string;
+    customerAddress?: string | null;
+    subtotal: number;
+    totalAmount: number;
+    depositAmount: number;
+    depositPaymentMode: PaymentMode;
+    deliveryDate: string | null;
+    notes: string | null;
+    isGst?: boolean;
+    gstPercentage?: number;
+    gstAmount?: number;
+    discountAmount?: number;
+    discountType?: 'PERCENT' | 'FIXED';
+    discountValue?: number;
+    manualDiscountAmount?: number;
+    couponDiscountAmount?: number;
+    couponCode?: string | null;
+    taxMode?: 'exclusive' | 'inclusive';
+    depositSplitCash?: number;
+    depositSplitGpay?: number;
+    deliveryFee?: number;
+    items: {
+      product_id: string | null;
+      snapshot_name: string;
+      snapshot_desc: string | null;
+      snapshot_price: number;
+      quantity: number;
+    }[];
+  }): Promise<{ advanceOrderId: string }> {
+    if (isSupabaseConfigured) {
+      try {
+        const firstItem = payload.items[0];
+        const structuredItems = payload.items.map((i) => ({
+          name: i.snapshot_name,
+          desc: i.snapshot_desc,
+          price: i.snapshot_price,
+          qty: i.quantity,
+          product_id: i.product_id,
+        }));
+
+        // Calculate a safe expected delivery date (advance_orders has NOT NULL constraint on expected_delivery_date)
+        let deliveryDateStr = payload.deliveryDate;
+        if (!deliveryDateStr || !deliveryDateStr.trim()) {
+          const d = new Date();
+          d.setDate(d.getDate() + 7);
+          deliveryDateStr = d.toISOString().split('T')[0];
+        }
+
+        // 1. Insert into dedicated advance_orders table
+        // Note: remaining_balance is a GENERATED column in Postgres, so it must NOT be in insert payload.
+        // product_id does NOT exist in advance_orders schema, so it is omitted.
+        const { error: advErr } = await supabase.from('advance_orders').insert({
+          deposit_id: payload.advanceOrderId,
+          customer_name: payload.customerName.trim() || 'Guest',
+          phone: payload.customerPhone.trim() || '',
+          address: payload.customerAddress?.trim() || '',
+          product_name: firstItem?.snapshot_name || 'Tailoring Item',
+          products: structuredItems,
+          total_amount: payload.totalAmount,
+          deposit_amount: payload.depositAmount,
+          expected_delivery_date: deliveryDateStr,
+          remarks: payload.notes || '',
+          status: 'pending_deposit',
+        });
+
+        if (advErr) {
+          console.warn('Supabase advance_orders table insert failed:', advErr.message, advErr.details);
+        }
+
+        // 2. Also dual-persist to orders table with all query reconciliation flags:
+        // order_type: 'ADVANCE', invoice_no: DEP-..., status: 'PENDING'
+        try {
+          const isGst = Boolean(payload.isGst || (payload.gstAmount && payload.gstAmount > 0));
+          const advOrdRow: Record<string, any> = {
+            invoice_no: payload.advanceOrderId,
+            customer_name: payload.customerName.trim() || 'Guest',
+            phone: payload.customerPhone.trim() || '',
+            address: payload.customerAddress?.trim() || '',
+            order_mode: 'offline',
+            order_type: 'ADVANCE',
+            is_advance: true,
+            status: 'PENDING',
+            balance_due: Math.max(0, payload.totalAmount - payload.depositAmount),
+            amount_paid: payload.depositAmount,
+            subtotal: payload.subtotal,
+            total: payload.totalAmount,
+            discount_amount: payload.discountAmount || 0,
+            manual_discount_amount: Number(payload.manualDiscountAmount) || 0,
+            manual_discount_type: payload.discountType === 'PERCENT' ? 'percent' : 'flat',
+            manual_discount_value: payload.discountValue || 0,
+            coupon_code: payload.couponCode || null,
+            split_details: buildSplitDetails({
+              cash: payload.depositPaymentMode === 'SPLIT' ? Number(payload.depositSplitCash) || 0 : undefined,
+              gpay: payload.depositPaymentMode === 'SPLIT' ? Number(payload.depositSplitGpay) || 0 : undefined,
+              gstPercentage: isGst ? Number(payload.gstPercentage) || 0 : 0,
+              manualDiscount: payload.manualDiscountAmount !== undefined ? Number(payload.manualDiscountAmount) || 0 : Number(payload.discountAmount) || 0,
+              couponDiscount: Number(payload.couponDiscountAmount) || 0,
+              taxMode: payload.taxMode,
+            }),
+            gst_enabled: isGst,
+            total_gst: isGst ? (payload.gstAmount || 0) : 0,
+            gst_amount: isGst ? (payload.gstAmount || 0) : 0,
+            delivery_charge: payload.deliveryFee || 0,
+            payment_mode: payload.depositPaymentMode,
+            payment_method: payload.depositPaymentMode.toLowerCase(),
+            cash_received: payload.depositAmount,
+            notes: payload.notes || null,
+            items: structuredItems,
+            created_at: new Date().toISOString(),
+          };
+
+          let { error: ordErr } = await supabase.from('orders').insert(advOrdRow);
+          if (ordErr && (ordErr.code === 'PGRST204' || /amount_paid|balance_due|is_advance/i.test(ordErr.message))) {
+            const { amount_paid, balance_due, is_advance, ...safeAdvOrdRow } = advOrdRow;
+            const retry = await supabase.from('orders').insert(safeAdvOrdRow);
+            ordErr = retry.error;
+          }
+          if (ordErr) {
+            console.warn('Supabase orders dual-insert for advance order:', ordErr.message);
+          }
+        } catch (dualErr) {
+          console.warn('Supabase orders dual-insert error:', dualErr);
+        }
+
+        return { advanceOrderId: payload.advanceOrderId };
+      } catch (err) {
+        console.warn('Supabase createAdvanceOrder failed:', err);
+      }
+    }
+
+    try {
+      const customer = await this.upsertCustomer(
+        payload.customerName,
+        payload.customerPhone,
+        payload.customerAddress,
+      );
+
+      await sql`
+        INSERT INTO advance_orders (
+          id, customer_id, status, subtotal, total_amount, deposit_amount,
+          deposit_payment_mode, delivery_date, notes
+        ) VALUES (
+          ${payload.advanceOrderId}, ${customer.id}, 'PENDING',
+          ${payload.subtotal}, ${payload.totalAmount}, ${payload.depositAmount},
+          ${payload.depositPaymentMode}, ${payload.deliveryDate}, ${payload.notes}
+        )
+      `;
+
+      await Promise.all(
+        payload.items.map((it) =>
+          sql`
+            INSERT INTO advance_order_items (
+              id, advance_order_id, product_id, snapshot_name, snapshot_desc, snapshot_price, quantity
+            ) VALUES (
+              ${uid()}, ${payload.advanceOrderId}, ${it.product_id},
+              ${it.snapshot_name}, ${it.snapshot_desc}, ${it.snapshot_price}, ${it.quantity}
+            )
+          `
+        ),
+      );
+    } catch {
+      // ignore
+    }
+
+    return { advanceOrderId: payload.advanceOrderId };
+  },
+
+  async updateAdvanceOrderStatus(id: string, status: AdvanceOrderStatus): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        const hmStatus = status === 'COMPLETED' ? 'completed' : status === 'CANCELLED' ? 'cancelled' : status === 'READY' ? 'ready_for_delivery' : 'pending_deposit';
+
+        // When marked COMPLETED, fetch order total to recognize full payment and zero balance
+        let orderTotal = 0;
+        let ordRows: any[] | null = null;
+        let advRows: any[] | null = null;
+        try {
+          let sel = supabase.from('orders').select('id, total, grand_total, deposit_amount, amount_paid');
+          if (isUuid(id)) {
+            sel = sel.or(keyFilter(id));
+          } else {
+            sel = sel.eq('invoice_no', id);
+          }
+          const { data } = await sel.limit(1);
+          ordRows = data;
+          if (ordRows && ordRows[0]) {
+            orderTotal = Number(ordRows[0].total ?? ordRows[0].grand_total ?? 0);
+          }
+        } catch {
+          // ignore
+        }
+
+        if (!orderTotal) {
+          try {
+            let selAdv = supabase.from('advance_orders').select('id, total_amount, deposit_amount');
+            if (isUuid(id)) {
+              selAdv = selAdv.or(keyFilter(id, 'deposit_id'));
+            } else {
+              selAdv = selAdv.eq('deposit_id', id);
+            }
+            const { data } = await selAdv.limit(1);
+            advRows = data;
+            if (advRows && advRows[0]) {
+              orderTotal = Number(advRows[0].total_amount ?? 0);
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        const advUpdates: Record<string, any> = {
+          status: hmStatus,
+          updated_at: new Date().toISOString(),
+          ...(status === 'COMPLETED' ? { completed_at: new Date().toISOString() } : {}),
+        };
+
+        let qAdv = supabase.from('advance_orders').update(advUpdates);
+        if (isUuid(id)) {
+          qAdv = qAdv.or(`id.eq.${id},deposit_id.eq.${id}`);
+        } else {
+          qAdv = qAdv.eq('deposit_id', id);
+        }
+        const { error: advErr } = await qAdv;
+        if (advErr) console.warn('Supabase advance_orders update error:', advErr);
+
+        const ordUpdates: any = {
+          status: status === 'COMPLETED' ? 'COMPLETED' : status,
+          updated_at: new Date().toISOString(),
+        };
+        if (status === 'COMPLETED') {
+          // Paid / balance intentionally left untouched (static)
+        } else if (status === 'PENDING' || status === 'READY') {
+          ordUpdates.credit_status = 'outstanding';
+          if (orderTotal > 0) {
+            const origDep = Number(advRows?.[0]?.deposit_amount ?? ordRows?.[0]?.deposit_amount ?? ordRows?.[0]?.amount_paid ?? 0);
+            if (origDep > 0 && origDep < orderTotal) {
+              ordUpdates.amount_paid = origDep;
+              ordUpdates.cash_received = origDep;
+              ordUpdates.balance_due = Math.max(0, orderTotal - origDep);
+              advUpdates.deposit_amount = origDep;
+            }
+          }
+        }
+
+        let qOrd = supabase.from('orders').update(ordUpdates);
+        if (isUuid(id)) {
+          qOrd = qOrd.or(keyFilter(id));
+        } else {
+          qOrd = qOrd.eq('invoice_no', id);
+        }
+        const { error: ordErr } = await qOrd;
+        if (ordErr) console.warn('Supabase orders advance update error:', ordErr);
+      } catch (e) {
+        console.warn('updateAdvanceOrderStatus error:', e);
+      }
+    }
+
+    try {
+      await sql`UPDATE advance_orders SET status = ${status} WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  async cancelAdvanceOrder(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        let qAdv = supabase.from('advance_orders').update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        });
+        if (isUuid(id)) {
+          qAdv = qAdv.or(`id.eq.${id},deposit_id.eq.${id}`);
+        } else {
+          qAdv = qAdv.eq('deposit_id', id);
+        }
+        await qAdv;
+      } catch {
+        // ignore
+      }
+      try {
+        let qOrd = supabase.from('orders').update({
+          status: 'CANCELLED',
+          balance_due: 0,
+          updated_at: new Date().toISOString(),
+        });
+        if (isUuid(id)) {
+          qOrd = qOrd.or(keyFilter(id));
+        } else {
+          qOrd = qOrd.eq('invoice_no', id);
+        }
+        await qOrd;
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      await sql`
+        UPDATE advance_orders
+        SET status = 'CANCELLED', cancelled_at = now()
+        WHERE id = ${id}
+      `;
+    } catch {
+      // ignore
+    }
+  },
+
+  async deleteAdvanceOrder(id: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        let qAdv = supabase.from('advance_orders').delete();
+        if (isUuid(id)) {
+          qAdv = qAdv.or(keyFilter(id, 'deposit_id'));
+        } else {
+          qAdv = qAdv.eq('deposit_id', id);
+        }
+        await qAdv;
+      } catch {
+        // ignore
+      }
+      try {
+        let qOrd = supabase.from('orders').delete();
+        if (isUuid(id)) {
+          qOrd = qOrd.or(keyFilter(id));
+        } else {
+          qOrd = qOrd.eq('invoice_no', id);
+        }
+        await qOrd;
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      await sql`DELETE FROM advance_orders WHERE id = ${id}`;
+    } catch {
+      // ignore
+    }
+  },
+
+  async finalizeAdvanceOrder(payload: {
+    advanceOrderId: string;
+    invoiceId: string;
+    isGst: boolean;
+    gstPercentage: number;
+    discountType: 'PERCENT' | 'FIXED';
+    discountValue: number;
+    discountAmount: number;
+    deliveryFee: number;
+    paymentMode: PaymentMode;
+    billDate: string;
+    manualDiscountAmount?: number;
+    couponDiscountAmount?: number;
+    couponCode?: string | null;
+    splitCash?: number;
+    splitGpay?: number;
+  }): Promise<{ orderId: string }> {
+    // Idempotency check: if an order with this reference number or invoiceId already exists, do not duplicate
+    if (isSupabaseConfigured) {
+      try {
+        const { data: existing } = await supabase
+          .from('orders')
+          .select('invoice_no, id')
+          .or(`reference_number.eq.${payload.advanceOrderId},invoice_no.eq.${payload.invoiceId}`)
+          .limit(1)
+          .maybeSingle();
+        if (existing) {
+          await this.updateAdvanceOrderStatus(payload.advanceOrderId, 'COMPLETED');
+          return { orderId: existing.invoice_no || payload.invoiceId };
+        }
+      } catch {}
+    }
+
+    const advance = await this.getAdvanceOrder(payload.advanceOrderId);
+    if (!advance) throw new Error('Advance order not found');
+
+    const cart: CartItem[] = advance.items.map((it) => ({
+      id: it.id,
+      product_id: it.product_id,
+      name: it.snapshot_name,
+      desc: it.snapshot_desc || '',
+      price: Number(it.snapshot_price),
+      qty: it.quantity,
+    }));
+
+    const rawSubtotal = cart.reduce((acc, i) => acc + i.price * i.qty, 0);
+    // Reuse the exact discount split saved on the advance bill so the final invoice
+    // total always equals the advance total (coupon included).
+    const advTotalsFull = calculateOrderTotals(advance);
+    const billTaxMode = advTotalsFull.taxMode;
+    const manualAmt = payload.manualDiscountAmount ?? advTotalsFull.manualDiscount;
+    const couponAmt = payload.couponDiscountAmount ?? advTotalsFull.couponDiscount;
+    const orderTotals = calculateOrderTotals({
+      items: cart,
+      subtotal: rawSubtotal,
+      manualDiscount: manualAmt,
+      couponDiscount: couponAmt,
+      taxMode: billTaxMode,
+      discount_type: payload.discountType,
+      discount_value: payload.discountValue,
+      is_gst: payload.isGst,
+      gst_percentage: payload.gstPercentage,
+      delivery_fee: payload.deliveryFee,
+    });
+
+    // How the earlier deposit and the closing balance were each paid.
+    const depositModeRaw = String((advance as any).deposit_payment_mode || (advance as any).payment_mode || 'CASH').toUpperCase();
+    const depMode = depositModeRaw === 'GPAY' || depositModeRaw === 'SPLIT' ? depositModeRaw : 'CASH';
+    const depPaid = advTotalsFull.paid;
+    const depCash = depMode === 'SPLIT' ? Number((advance as any).split_cash) || 0 : depMode === 'GPAY' ? 0 : depPaid;
+    const depGpay = depMode === 'SPLIT' ? Number((advance as any).split_gpay) || 0 : depMode === 'GPAY' ? depPaid : 0;
+    const balanceNow = Math.max(0, Math.round((orderTotals.total - depPaid) * 100) / 100);
+    const balMode: 'CASH' | 'GPAY' | 'SPLIT' = payload.paymentMode === 'GPAY' || payload.paymentMode === 'SPLIT' ? payload.paymentMode : 'CASH';
+    const balCash = balMode === 'SPLIT' ? Number(payload.splitCash) || 0 : balMode === 'GPAY' ? 0 : balanceNow;
+    const balGpay = balMode === 'SPLIT' ? Number(payload.splitGpay) || 0 : balMode === 'GPAY' ? balanceNow : 0;
+    if (balMode === 'SPLIT' && Math.abs(balCash + balGpay - balanceNow) > 0.009) {
+      throw new Error('Split amounts must add up to the balance due');
+    }
+    const overallCash = Math.round((depCash + balCash) * 100) / 100;
+    const overallGpay = Math.round((depGpay + balGpay) * 100) / 100;
+    const overallMode: PaymentMode = overallCash > 0 && overallGpay > 0 ? 'SPLIT' : overallGpay > 0 ? 'GPAY' : 'CASH';
+
+    const { orderId } = await this.submitOrder({
+      orderId: payload.invoiceId,
+      customerName: advance.customer_name,
+      customerPhone: advance.customer_phone,
+      customerAddress: advance.customer_address,
+      source: 'OFFLINE',
+      isGst: payload.isGst,
+      billDate: payload.billDate,
+      items: cart,
+      discountType: payload.discountType,
+      discountValue: payload.discountValue,
+      discountAmount: orderTotals.discount,
+      gstPercentage: payload.isGst ? orderTotals.gstRate : 0,
+      gstAmount: orderTotals.gst,
+      deliveryFee: orderTotals.deliveryFee,
+      grandTotal: orderTotals.total,
+      cashReceived: orderTotals.total,
+      paymentMode: overallMode,
+      splitCash: overallMode === 'SPLIT' ? overallCash : 0,
+      splitGpay: overallMode === 'SPLIT' ? overallGpay : 0,
+      manualDiscountAmount: orderTotals.manualDiscount,
+      couponDiscountAmount: orderTotals.couponDiscount,
+      couponCode: payload.couponCode || (advance as any).coupon_code || null,
+      taxMode: billTaxMode,
+      advancePaidEarlier: advTotalsFull.paid,
+      advanceMode: depMode,
+      advanceCash: depCash,
+      advanceGpay: depGpay,
+      settlePayment: {
+        mode: balMode,
+        cash: balCash,
+        gpay: balGpay,
+        amount: balanceNow,
+        at: payload.billDate,
+      },
+      referenceNumber: payload.advanceOrderId,
+      remarks: `Advance order hold completed: #${payload.advanceOrderId}`,
+    });
+
+    await this.updateAdvanceOrderStatus(payload.advanceOrderId, 'COMPLETED');
+    if (isSupabaseConfigured) {
+      // Keep the advance (DEP-) receipt in sync: record how the balance was paid.
+      try {
+        const { data: depRow } = await supabase
+          .from('orders')
+          .select('id, split_details')
+          .eq('invoice_no', payload.advanceOrderId)
+          .maybeSingle();
+        if (depRow?.id) {
+          await supabase
+            .from('orders')
+            .update({
+              credit_paid_at: payload.billDate,
+              split_details: buildSplitDetails({
+                existing: depRow.split_details,
+                settle: { mode: balMode, cash: balCash, gpay: balGpay, amount: balanceNow, at: payload.billDate },
+              }),
+            })
+            .eq('id', depRow.id);
+        }
+      } catch {}
+      try {
+        await supabase
+          .from('advance_orders')
+          .update({
+            completed_order_id: payload.invoiceId,
+            invoice_number: payload.invoiceId,
+            status: 'completed',
+            deposit_amount: orderTotals.total,
+            completed_at: new Date().toISOString(),
+          })
+          .or(`id.eq.${payload.advanceOrderId},deposit_id.eq.${payload.advanceOrderId}`);
+
+        await supabase
+          .from('orders')
+          .update({
+            status: 'COMPLETED',
+            cash_received: orderTotals.total,
+            amount_paid: orderTotals.total,
+            balance_due: 0,
+            updated_at: new Date().toISOString(),
+          })
+          .or(`invoice_no.eq.${payload.advanceOrderId},id.eq.${payload.advanceOrderId}`);
+      } catch {}
+    }
+
+    return { orderId };
+  },
+
+  // â”€â”€ OUTSTANDING CREDITS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  async markCreditOrderPaid(orderId: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        const paidAt = new Date().toISOString();
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('total, grand_total')
+          .or(keyFilter(orderId))
+          .maybeSingle();
+
+        const orderTotal = Number(ord?.total ?? ord?.grand_total ?? 0);
+
+        const { error: directErr } = await supabase
+          .from('orders')
+          .update({
+            status: 'COMPLETED',
+            credit_status: 'paid',
+            balance_due: 0,
+            amount_paid: orderTotal,
+            credit_paid_at: paidAt,
+            updated_at: paidAt,
+          })
+          .or(keyFilter(orderId));
+        if (directErr) console.warn('Supabase markCreditOrderPaid direct update failed:', directErr);
+      } catch (e) {
+        console.warn('Supabase markCreditOrderPaid error:', e);
+      }
+    }
+  },
+
+  async updateCreditDueDate(orderId: string, dueDate: string): Promise<void> {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('orders')
+          .update({
+            // keep both columns in sync - readers prefer due_date, so a stale one hides the change
+            due_date: dueDate || null,
+            credit_due_date: dueDate || null,
+            updated_at: new Date().toISOString(),
+          })
+          .or(keyFilter(orderId));
+        if (error) {
+          console.warn('Supabase updateCreditDueDate failed:', error);
+          throw new Error(error.message);
+        }
+      } catch (e) {
+        console.warn('Supabase updateCreditDueDate error:', e);
+      }
+    }
+  },
+};

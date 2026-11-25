@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/pos/admin/secure/control-panel/hm-boutique",
+      "permanent": false
+    }
+  ]
+}

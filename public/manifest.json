@@ -1,0 +1,25 @@
+{
+  "name": "Bhuvana Bridal and Covering - POS",
+  "short_name": "Bhuvana Bridal",
+  "description": "Bhuvana Bridal and Covering Point of Sale, Billing & Store Management",
+  "start_url": "/pos/admin/secure/control-panel/hm-boutique",
+  "display": "standalone",
+  "background_color": "#FFF7EE",
+  "theme_color": "#A4164E",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
