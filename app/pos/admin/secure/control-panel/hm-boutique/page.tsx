@@ -114,7 +114,7 @@ import { useHardwareBarcodeScanner } from "@/lib/useHardwareBarcodeScanner";
 import { getCustomerProfile, saveCustomerBirthday } from "@/app/pos/birthdayActions";
 import InvoiceModal from "@/app/components/InvoiceModal";
 import PrintSettingsModal from "@/app/components/PrintSettingsModal";
-import { checkCoupon, adjustProductStock, seedCatalog, createMeasurementOrder } from "@/app/pos/actions";
+import { checkCoupon, adjustProductStock, createMeasurementOrder } from "@/app/pos/actions";
 import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, BRAND_LOGO, DEFAULT_SHOP_PROFILE } from "@/lib/brand";
 import { calculateTaxAndTotals, formatINR } from "@/lib/money";
 import { getOrderTotals, calculateOrderTotals, calculateBillTotals } from "@/lib/orderTotals";
@@ -8760,45 +8760,6 @@ export default function POSBilling() {
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Product
                 </button>
-                <button
-                  onClick={async () => {
-                    setIsSeedingCatalog(true);
-                    setSeedResult(null);
-                    try {
-                      const res = await seedCatalog();
-                      const msg = res.errors.length > 0
-                        ? `⚠️ ${res.productsSeeded} seeded, ${res.duplicatesRemoved} deduped. Errors: ${res.errors.join('; ')}`
-                        : `✅ Catalogue seeded! ${res.categoriesSeeded} categories, ${res.productsSeeded} products, ${res.duplicatesRemoved} duplicates removed.`;
-                      setSeedResult(msg);
-                      // Refresh product list
-                      const fresh = await (await import('@/app/pos/actions')).fetchProducts();
-                      setCatalog(fresh.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        desc: p.description || '',
-                        price: Number(p.selling_price) || 0,
-                        gst: p.gst_rate || 0,
-                        category: p.category,
-                        sku: p.sku || '',
-                        stock: p.stock_quantity ?? 999,
-                        alertAt: p.low_stock_alert ?? 5,
-                        purchasePrice: p.purchase_price || 0,
-                        itemType: p.item_type || 'product',
-                        unitLabel: p.unit_label || '',
-                      })));
-                    } catch (e: any) {
-                      setSeedResult(`❌ Error: ${e?.message}`);
-                    } finally {
-                      setIsSeedingCatalog(false);
-                    }
-                  }}
-                  disabled={isSeedingCatalog}
-                  title="Loads the built-in sample catalogue (tailoring course list) into your products"
-                  className="text-[10px] font-bold text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 px-3 py-2 rounded-lg uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  {isSeedingCatalog ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {isSeedingCatalog ? 'Seeding…' : 'Seed Catalogue'}
-                </button>
               </div>
             </div>
 
@@ -8817,43 +8778,6 @@ export default function POSBilling() {
                   <p className="text-xs font-semibold text-[#27272A] bg-[#F0FDF4] border border-green-200 rounded-lg px-3 py-2 mb-3 max-w-sm mx-auto">{seedResult}</p>
                 )}
                 <div className="flex flex-wrap gap-2 justify-center">
-                <button
-                  onClick={async () => {
-                    setIsSeedingCatalog(true);
-                    setSeedResult(null);
-                    try {
-                      const res = await seedCatalog();
-                      const msg = res.errors.length > 0
-                        ? `⚠️ ${res.productsSeeded} seeded, ${res.duplicatesRemoved} deduped. Errors: ${res.errors.join('; ')}`
-                        : `✅ Catalogue seeded! ${res.categoriesSeeded} categories, ${res.productsSeeded} products, ${res.duplicatesRemoved} duplicates removed.`;
-                      setSeedResult(msg);
-                      const fresh = await (await import('@/app/pos/actions')).fetchProducts();
-                      setCatalog(fresh.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        desc: p.description || '',
-                        price: Number(p.selling_price) || 0,
-                        gst: p.gst_rate || 0,
-                        category: p.category,
-                        sku: p.sku || '',
-                        stock: p.stock_quantity ?? 999,
-                        alertAt: p.low_stock_alert ?? 5,
-                        purchasePrice: p.purchase_price || 0,
-                        itemType: p.item_type || 'product',
-                        unitLabel: p.unit_label || '',
-                      })));
-                    } catch (e: any) {
-                      setSeedResult(`❌ Error: ${e?.message}`);
-                    } finally {
-                      setIsSeedingCatalog(false);
-                    }
-                  }}
-                  disabled={isSeedingCatalog}
-                  className="text-[10px] font-bold text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 px-4 py-2 rounded-lg uppercase tracking-wider inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  {isSeedingCatalog ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {isSeedingCatalog ? 'Seeding…' : '🌱 Initialize Catalogue'}
-                </button>
                 <button
                   onClick={() => {
                     resetCatalogForm();
