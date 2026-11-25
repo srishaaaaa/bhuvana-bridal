@@ -17,7 +17,7 @@ import {
   profileFromSettings,
   DEFAULT_UPI_MESSAGE,
 } from '@/lib/brand';
-import { buildUpiLink, fillUpiMessage, isValidUpiId } from '@/lib/upi';
+import { buildPayPageLink, fillUpiMessage, isValidUpiId, siteBaseUrl } from '@/lib/upi';
 import { fetchStoreSettings, saveStoreSettings } from '@/app/pos/actions';
 
 type FormState = {
@@ -426,7 +426,7 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
                   upiId: form.upiId,
                   gpayNumber: form.gpayNumber,
                   link: form.upiId.trim() && isValidUpiId(form.upiId)
-                    ? buildUpiLink({ upiId: form.upiId, payee: form.upiPayeeName || form.name, amount: 2500, note: 'Bill INV-0001' })
+                    ? buildPayPageLink(siteBaseUrl() || 'https://your-site', { amount: 2500, name: 'Priya', note: 'P05W8CVE0' })
                     : '(add your UPI ID)',
                   bill: 'INV-0001',
                 })}

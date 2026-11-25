@@ -4,11 +4,25 @@ import React, { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { MessageCircle, QrCode, Settings } from 'lucide-react';
 import { BRAND_EN, BRAND_GPAY_NUMBER, BRAND_UPI_ID, BRAND_UPI_MESSAGE, BRAND_UPI_PAYEE, toE164 } from '@/lib/brand';
-import { UPI_VIA_OPTIONS, buildUpiLink, fillUpiMessage, isValidUpiId, newPaymentNote, type UpiVia } from '@/lib/upi';
+import {
+  UPI_VIA_OPTIONS,
+  buildPayPageLink,
+  buildUpiLink,
+  fillUpiMessage,
+  isPrivateAddress,
+  isValidUpiId,
+  newPaymentNote,
+  siteBaseUrl,
+  type UpiVia,
+} from '@/lib/upi';
 
 const QR_LIFETIME_SECONDS = 120;
 
-const money = (n: number) => `₹${(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const money = (n: number) => {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const d = Number.isInteger(v) ? 0 : 2;
+  return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: 2 })}`;
+};
 
 /**
  * UPI collection block shown in billing when the payment mode is UPI:
@@ -35,6 +49,9 @@ export default function UpiPaymentPanel({
   const [secondsLeft, setSecondsLeft] = useState(QR_LIFETIME_SECONDS);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [sendError, setSendError] = useState('');
+  const [siteBase, setSiteBase] = useState('');
+  useEffect(() => setSiteBase(siteBaseUrl()), []);
+  const linkUnreachable = !siteBase || isPrivateAddress(siteBase);
 
   // Fresh QR (new reference note) every 2 minutes, and whenever the amount changes.
   useEffect(() => {
@@ -84,11 +101,13 @@ export default function UpiPaymentPanel({
       return;
     }
     setSendError('');
+    // The customer gets an https payment page (tappable in WhatsApp) with app buttons and the QR.
+    const payPage = hasUpi && !linkUnreachable ? buildPayPageLink(siteBase, { amount, name: customerName, note }) : '';
     const text = fillUpiMessage(BRAND_UPI_MESSAGE, {
       name: customerName,
       amount,
       shop: BRAND_EN,
-      link,
+      link: payPage,
       upiId: hasUpi ? upiId : '',
       gpayNumber: BRAND_GPAY_NUMBER,
       bill: note,
@@ -168,6 +187,12 @@ export default function UpiPaymentPanel({
           <MessageCircle size={15} /> Send payment link on WhatsApp
         </button>
         {sendError && <p className="text-[11px] font-bold text-red-600">{sendError}</p>}
+        {hasUpi && linkUnreachable && (
+          <p className="text-[10px] font-semibold leading-snug text-amber-700">
+            This app is open on a local address, so the message will have the UPI ID and GPay number but no tap-to-pay
+            link. Open the app from its live website (or set NEXT_PUBLIC_SITE_URL) to include the payment page link.
+          </p>
+        )}
       </div>
     </div>
   );

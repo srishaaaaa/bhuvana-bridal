@@ -11,6 +11,8 @@ import { fetchStoreSettings } from "@/app/pos/actions";
  */
 export default function ShopProfileSync() {
   useEffect(() => {
+    // Customer-facing payment page reads its own details; never reload it.
+    if (window.location.pathname.startsWith('/pay')) return;
     let cancelled = false;
     (async () => {
       try {
