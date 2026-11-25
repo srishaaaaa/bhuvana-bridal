@@ -1,4 +1,4 @@
-// HM Boutique service worker
+// Bhuvana Bridal and Covering service worker
 //  - Static files (hashed JS/CSS, fonts, images, icons): cache-first, so repeat visits do not wait on the network.
 //  - Pages: network-first (always fresh data), with the cached copy only as an offline fallback.
 //  - Everything else (API calls, server actions) is left alone.

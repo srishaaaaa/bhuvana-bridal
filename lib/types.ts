@@ -16,7 +16,7 @@ export type Product = {
   selling_price: number; // GST-inclusive catalog price
   created_at: string;
 
-  // HM Boutique Extended Inventory Fields
+  // Extended inventory fields
   sku?: string;
   barcode?: string | null;
   stock_quantity?: number;

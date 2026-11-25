@@ -28,7 +28,7 @@ const { chromium } = require('C:/freelance/HM-main/HM/node_modules/playwright');
     sessionStorage.setItem('pos_role', 'admin');
   });
 
-  await posPage.goto('http://localhost:3001/pos/admin/secure/control-panel/hm-boutique', { waitUntil: 'domcontentloaded' });
+  await posPage.goto('http://localhost:3001/pos', { waitUntil: 'domcontentloaded' });
   await posPage.waitForTimeout(2000);
 
   // Switch to Advance Orders tab

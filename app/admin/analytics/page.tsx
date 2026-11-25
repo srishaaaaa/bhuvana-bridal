@@ -255,7 +255,7 @@ export default function AdminAnalyticsPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Link
-                href="/pos/admin/secure/control-panel/hm-boutique"
+                href="/pos"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-[#A4164E] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to POS Control Panel

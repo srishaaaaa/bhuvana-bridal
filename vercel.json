@@ -2,8 +2,13 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/pos/admin/secure/control-panel/hm-boutique",
+      "destination": "/pos",
       "permanent": false
+    },
+    {
+      "source": "/pos/admin/secure/control-panel/:path*",
+      "destination": "/pos",
+      "permanent": true
     }
   ]
 }

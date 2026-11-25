@@ -87,7 +87,7 @@ npm run dev
 Open http://localhost:3000.
 
 - Public showroom: `/`
-- POS terminal: `/pos/admin/secure/control-panel/hm-boutique`
+- POS terminal: `/pos`
 - Staff attendance kiosk: `/staff-attendance`
 - Digital invoice: `/invoice/[invoice-id]`
 - Advance order receipt: `/advance/[advance-id]`

@@ -115,7 +115,7 @@ import { getCustomerProfile, saveCustomerBirthday } from "@/app/pos/birthdayActi
 import InvoiceModal from "@/app/components/InvoiceModal";
 import PrintSettingsModal from "@/app/components/PrintSettingsModal";
 import { checkCoupon, adjustProductStock, createMeasurementOrder } from "@/app/pos/actions";
-import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, BRAND_LOGO, DEFAULT_SHOP_PROFILE } from "@/lib/brand";
+import { BRAND_EN, BRAND_SUBTITLE, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, BRAND_LOGO, DEFAULT_SHOP_PROFILE } from "@/lib/brand";
 import { calculateTaxAndTotals, formatINR } from "@/lib/money";
 import { getOrderTotals, calculateOrderTotals, calculateBillTotals } from "@/lib/orderTotals";
 import { ORDER_STATUS } from "@/lib/orderStatus";
@@ -692,7 +692,7 @@ export default function POSBilling() {
   }, [activeTab, analyticsSubTab, analyticsGstFilter]);
 
   useEffect(() => {
-    const prefs = localStorage.getItem("hm_boutique_print_prefs");
+    const prefs = localStorage.getItem("bhuvana_print_prefs") ?? localStorage.getItem("hm_boutique_print_prefs");
     if (prefs) {
       try {
         setPrintPrefs(JSON.parse(prefs));
@@ -3852,7 +3852,7 @@ export default function POSBilling() {
                   {BRAND_EN.toUpperCase()}
                 </span>
                 <span className="text-[9px] text-white/80 font-bold tracking-wider block mt-0.5">
-                  School of Fashion Designing & Tailoring
+                  {BRAND_SUBTITLE || "Bridal Wear & Covering"}
                 </span>
               </div>
             </div>

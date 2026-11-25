@@ -15,7 +15,7 @@ const fs = require('fs');
   });
 
   console.log('Navigating to POS on port 3001...');
-  await page.goto('http://localhost:3001/pos/admin/secure/control-panel/hm-boutique', { waitUntil: 'domcontentloaded' });
+  await page.goto('http://localhost:3001/pos', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2000);
 
   // Go to Advance Orders tab

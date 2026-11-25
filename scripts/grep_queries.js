@@ -7,7 +7,7 @@ const files = [
   'app/admin/analytics/page.tsx',
   'app/components/InvoiceModal.tsx',
   'app/components/OutstandingCredits.tsx',
-  'app/pos/admin/secure/control-panel/hm-boutique/page.tsx'
+  'app/pos/page.tsx'
 ];
 
 for (const f of files) {

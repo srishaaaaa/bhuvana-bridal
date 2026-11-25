@@ -91,14 +91,14 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
   if (!isOpen) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#2B0A16]/75 backdrop-blur-sm p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150">
       <div className="absolute inset-0" onClick={onClose} />
       <div className="relative z-10 bg-white rounded-none sm:rounded-3xl max-w-4xl w-full h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[92vh] border-0 sm:border border-gray-200 shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200 bg-[#111111] text-white shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-[#C9A063]/40 bg-gradient-to-r from-[#A4164E] to-[#5E0B2B] text-white shrink-0">
           <div>
             <h3 className="text-sm sm:text-base font-black tracking-wide text-white">Print Preview</h3>
-            <p className="text-[11px] sm:text-xs text-gray-300 font-semibold">
+            <p className="text-[11px] sm:text-xs text-[#F6E3B4] font-semibold">
               {individualLabels.length} Labels (1 Barcode Per Page • {sizeConfig.name} • {sizeConfig.widthMm} × {sizeConfig.heightMm} mm)
             </p>
           </div>
@@ -178,7 +178,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                 )}
                 {label.line3 && (
                   <span
-                    className="font-black text-[#111111] truncate max-w-full leading-none"
+                    className="font-black text-[#A4164E] truncate max-w-full leading-none"
                     style={{ fontSize: `${Math.max(8, Math.round(cardHeightPx * 0.095))}px` }}
                   >
                     {label.line3}
@@ -217,7 +217,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                 onClose()
                 onPrint()
               }}
-              className="px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#111111] border border-[#111111] text-white text-xs font-black uppercase tracking-wider hover:bg-black transition-all shadow-md flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
+              className="px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#A4164E] border border-[#A4164E] text-white text-xs font-black uppercase tracking-wider hover:bg-[#85103E] transition-all shadow-md flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
             >
               <Printer size={15} /> Print Labels
             </button>

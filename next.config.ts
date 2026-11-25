@@ -5,8 +5,14 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/",
-        destination: "/pos/admin/secure/control-panel/hm-boutique",
+        destination: "/pos",
         permanent: false,
+      },
+      // Old long address (bookmarks and already-installed apps keep working)
+      {
+        source: "/pos/admin/secure/control-panel/:path*",
+        destination: "/pos",
+        permanent: true,
       },
     ];
   },

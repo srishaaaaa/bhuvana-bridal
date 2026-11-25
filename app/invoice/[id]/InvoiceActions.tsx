@@ -108,7 +108,7 @@ export function InvoiceActions({
         {/* Return to POS (Admin only) */}
         {isAdmin && (
           <Link
-            href="/pos/admin/secure/control-panel/hm-boutique"
+            href="/pos"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-950 px-3 py-1.5 rounded-sm bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />

@@ -23,20 +23,20 @@ export const BarcodeRedirectDialog: React.FC<BarcodeRedirectDialogProps> = ({
       onClick={(e) => {
         if (e.target === e.currentTarget) handleCancel()
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#2B0A16]/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
     >
       <div className="bg-white rounded-3xl w-full max-w-sm border border-[#F3F4F6] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="bg-[#111111] p-4 border-b border-gray-400/30 flex items-center justify-between text-white">
+        <div className="bg-gradient-to-r from-[#A4164E] to-[#5E0B2B] p-4 border-b border-[#C9A063]/40 flex items-center justify-between text-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#1F1F1F] border border-[#111111] flex items-center justify-center text-white shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-[#85103E] border border-[#A4164E] flex items-center justify-center text-white shrink-0 shadow-sm">
               <ScanBarcode size={20} />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-black text-white tracking-wide">
                 Barcode Scanned
               </h3>
-              <p className="text-[11px] font-mono font-bold text-gray-300 truncate mt-0.5">
+              <p className="text-[11px] font-mono font-bold text-[#F6E3B4] truncate mt-0.5">
                 {pendingBarcode}
               </p>
             </div>
@@ -76,7 +76,7 @@ export const BarcodeRedirectDialog: React.FC<BarcodeRedirectDialogProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            className="px-5 py-2 text-xs font-black rounded-xl bg-[#111111] border border-[#111111] text-white hover:bg-black transition-all shadow-md flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
+            className="px-5 py-2 text-xs font-black rounded-xl bg-[#A4164E] border border-[#A4164E] text-white hover:bg-[#85103E] transition-all shadow-md flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
           >
             <ShoppingCart size={14} />
             <span>Go to Billing</span>

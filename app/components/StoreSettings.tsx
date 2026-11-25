@@ -439,7 +439,7 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm xl:col-span-2">
           <SectionTitle
             icon={<Sparkles size={18} />}
-            title="Fashion & Tailoring Catalogue Overview"
+            title="Catalogue Overview"
             hint="Live synchronized inventory from Supabase database"
           />
           <div className="flex flex-wrap items-center gap-3">

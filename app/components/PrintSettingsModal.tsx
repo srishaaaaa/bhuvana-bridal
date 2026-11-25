@@ -12,12 +12,13 @@ export interface PrintPrefs {
 }
 
 const DEFAULT_PREFS: PrintPrefs = { paper: "thermal", size: "80" };
-const PREFS_STORAGE_KEY = "hm_boutique_print_prefs";
+const PREFS_STORAGE_KEY = "bhuvana_print_prefs";
+const LEGACY_PREFS_STORAGE_KEY = "hm_boutique_print_prefs"; // read once so saved settings carry over
 
 export function getStoredPrintPrefs(): PrintPrefs {
   if (typeof window === "undefined") return DEFAULT_PREFS;
   try {
-    const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+    const raw = localStorage.getItem(PREFS_STORAGE_KEY) ?? localStorage.getItem(LEGACY_PREFS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (
