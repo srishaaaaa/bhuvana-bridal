@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Bhuvana Bridal",
+    title: "Bhuvana Bridal and Covering",
   },
   icons: {
     icon: "/logo.png",
@@ -49,7 +49,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Bhuvana Bridal" />
+        <meta name="apple-mobile-web-app-title" content="Bhuvana Bridal and Covering" />
         <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#FFF7EE] text-[#111111]">

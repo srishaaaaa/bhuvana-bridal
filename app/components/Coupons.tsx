@@ -10,6 +10,7 @@ import {
   recordCouponSent,
 } from '@/app/pos/actions';
 import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, toE164 } from '@/lib/brand';
+import { isPrivateAddress, siteBaseUrl } from '@/lib/upi';
 
 export interface CouponItem {
   id: number;
@@ -33,14 +34,30 @@ const inr = (n: number) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-const buildMessage = (c: CouponItem) => {
+/** Public coupon page (https, so WhatsApp makes it tappable); the customer can save it as a PDF there. */
+const couponLink = (c: CouponItem, name?: string) => {
+  const base = siteBaseUrl();
+  if (!base || isPrivateAddress(base)) return '';
+  const q = name && name.trim() ? `?n=${encodeURIComponent(name.trim().slice(0, 40))}` : '';
+  return `${base.replace(/\/+$/, '')}/coupon/${encodeURIComponent(c.code)}${q}`;
+};
+
+const buildMessage = (c: CouponItem, name?: string) => {
+  const link = couponLink(c, name);
   const lines = [
-    `🎉 *${BRAND_EN}*`,
+    `✨ *${BRAND_EN}* ✨`,
     '',
-    `Use coupon code *${c.code}* to get *${c.percentage}% OFF*${c.min_order_value ? ` on orders above ${inr(c.min_order_value)}` : ''}.`,
+    name && name.trim() ? `Dear ${name.trim()},` : 'Dear Customer,',
+    c.sent_only
+      ? 'Here is an exclusive coupon reserved just for you 💝'
+      : 'Here is an exclusive coupon for you 💝',
+    '',
+    `🎁 *${c.percentage}% OFF*${c.min_order_value ? ` on purchases above ${inr(c.min_order_value)}` : ''}`,
+    `🏷️ Code: *${c.code}*`,
   ];
-  if (c.expiry_date) lines.push(`Valid till ${fmtDate(c.expiry_date)}.`);
-  if (c.sent_only) lines.push('This offer is only for you.');
+  if (c.expiry_date) lines.push(`⏳ Valid till ${fmtDate(c.expiry_date)}`);
+  if (link) lines.push('', '👉 Open & download your coupon:', link);
+  lines.push('', 'Show this coupon at our billing counter to redeem.');
   if (BRAND_ADDRESS) lines.push('', `📍 ${BRAND_ADDRESS}`);
   if (BRAND_PHONE_DISPLAY) lines.push(`📞 ${BRAND_PHONE_DISPLAY}`);
   return lines.join('\n');
@@ -61,6 +78,7 @@ export default function Coupons() {
   const [search, setSearch] = useState('');
   const [sendTarget, setSendTarget] = useState<CouponItem | null>(null);
   const [sendPhone, setSendPhone] = useState('');
+  const [sendName, setSendName] = useState('');
   const [sendError, setSendError] = useState('');
 
   const loadCoupons = useCallback(async () => {
@@ -168,6 +186,7 @@ export default function Coupons() {
   const openSend = (c: CouponItem) => {
     setSendTarget(c);
     setSendPhone('');
+    setSendName('');
     setSendError('');
   };
 
@@ -177,7 +196,7 @@ export default function Coupons() {
     if (digits.length < 10) return setSendError('Enter a valid 10-digit mobile number');
     const res = await recordCouponSent(sendTarget.id, digits);
     if (!res.success) return setSendError(res.error || 'Could not record this send');
-    window.open(`https://wa.me/${toE164(digits)}?text=${encodeURIComponent(buildMessage(sendTarget))}`, '_blank', 'noopener');
+    window.open(`https://wa.me/${toE164(digits)}?text=${encodeURIComponent(buildMessage(sendTarget, sendName))}`, '_blank', 'noopener');
     setSendTarget(null);
     await loadCoupons();
   };
@@ -456,6 +475,15 @@ export default function Coupons() {
               <button onClick={() => setSendTarget(null)} className="rounded-full p-1 text-gray-500 hover:bg-gray-100"><X size={18} /></button>
             </div>
             <div>
+              <label className={labelCls}>Customer name (optional)</label>
+              <input
+                className={inputCls}
+                placeholder="e.g. Priya"
+                value={sendName}
+                onChange={e => setSendName(e.target.value)}
+              />
+            </div>
+            <div>
               <label className={labelCls}>Customer mobile number</label>
               <input
                 autoFocus
@@ -469,7 +497,7 @@ export default function Coupons() {
               />
               {sendError && <p className="mt-1.5 text-xs font-bold text-red-600">{sendError}</p>}
             </div>
-            <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 font-sans text-xs text-gray-700">{buildMessage(sendTarget)}</pre>
+            <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-3 font-sans text-xs text-gray-700">{buildMessage(sendTarget, sendName)}</pre>
             <button onClick={() => void confirmSend()}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-green-500 py-3 text-sm font-bold uppercase tracking-wider text-white hover:bg-green-600">
               <MessageCircle size={16} /> Send on WhatsApp

@@ -456,7 +456,7 @@ export const dbStore = {
     purchase_price?: number;
     item_type?: 'product' | 'service';
   }): Promise<Product> {
-    const sku = input.sku || `HM-${Date.now().toString().slice(-6)}`;
+    const sku = input.sku || `BB-${Date.now().toString().slice(-6)}`;
     const stockQuantity = Number(input.stock_quantity ?? 999);
     const lowStockAlert = Number(input.low_stock_alert ?? 5);
     const purchasePrice = Number(input.purchase_price ?? 0);

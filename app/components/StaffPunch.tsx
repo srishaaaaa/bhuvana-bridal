@@ -176,8 +176,8 @@ export default function StaffPunch({ embedded = false }: { embedded?: boolean })
         <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-[#A4164E] via-pink-400 to-[#A4164E]" />
 
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-white border border-[#A4164E]/30 mx-auto mb-3 p-1 overflow-hidden shadow-sm flex items-center justify-center">
-            <img src={BRAND_LOGO} alt="HM Logo" className="w-full h-full object-cover" />
+          <div className="w-20 h-20 rounded-2xl bg-[#FDF1E6] ring-1 ring-[#B8893E]/40 mx-auto mb-3 overflow-hidden shadow-sm">
+            <img src={BRAND_LOGO} alt="Bhuvana Bridal and Covering logo" className="block w-full h-full object-cover" />
           </div>
           <h1 className="text-xl font-black text-[#111111] uppercase tracking-tight">{BRAND_EN}</h1>
           <p className="text-xs font-bold text-[#A4164E] uppercase tracking-widest mt-0.5">Staff Self-Punch Portal</p>

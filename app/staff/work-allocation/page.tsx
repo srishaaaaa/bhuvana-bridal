@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = {
-  title: "Staff Work Allocation • HM Boutique",
+  title: "Staff Work Allocation • Bhuvana Bridal and Covering",
   description: "Staff Task Tracker and Unit Progress Management",
 };
 
@@ -15,11 +15,11 @@ export default function StaffWorkAllocationPage() {
         <div className="flex items-center gap-3">
           <img
             src="/logo.png"
-            alt="HM Boutique"
-            className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+            alt="Bhuvana Bridal and Covering"
+            className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-2 ring-white/70"
           />
           <div>
-            <h1 className="text-base font-black tracking-tight leading-tight">HM BOUTIQUE</h1>
+            <h1 className="text-base font-black tracking-tight leading-tight">BHUVANA BRIDAL AND COVERING</h1>
             <p className="text-[10px] text-white/80 font-bold uppercase tracking-wider">
               Staff Portal • Work Allocation
             </p>

@@ -2142,7 +2142,7 @@ export default function POSBilling() {
     const checkEmoji = String.fromCodePoint(0x2705);
     const moneyEmoji = String.fromCodePoint(0x1f4b0);
     const receiptEmoji = String.fromCodePoint(0x1f4e6);
-    let message = `${shopEmoji} *HM BOUTIQUE* ${shopEmoji}\n\n`;
+    let message = `${shopEmoji} *${BRAND_EN.toUpperCase()}* ${shopEmoji}\n\n`;
     message += `${checkEmoji} Here are your ${orderTotals.isGst ? "GST invoice" : "bill"} details!\n\n`;
 
     message += `Subtotal: ₹${orderTotals.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}\n`;
@@ -2198,7 +2198,7 @@ export default function POSBilling() {
       n.toLocaleString(undefined, { minimumFractionDigits: 2 });
     const shopEmoji = String.fromCodePoint(0x2728);
     const receiptEmoji = String.fromCodePoint(0x1f4e6);
-    let message = `${shopEmoji} *HM BOUTIQUE* ${shopEmoji}\n\n`;
+    let message = `${shopEmoji} *${BRAND_EN.toUpperCase()}* ${shopEmoji}\n\n`;
     message += `Advance order confirmed!\n\n`;
     message += `Order Total: ₹${fmt(receipt.total)}\n`;
     message += `Deposit Paid: ₹${fmt(receipt.deposit)}\n`;
@@ -3221,22 +3221,22 @@ export default function POSBilling() {
 
           {/* Logo with Gradient Hover Glow */}
           <div className="relative group mb-6">
-            <div className="absolute -inset-1.5 bg-gradient-to-r from-[#A4164E] to-[#A4164E] rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            <div className="relative w-20 h-20 bg-white rounded-2xl p-3.5 border border-[#A4164E]/30 shadow-lg flex items-center justify-center">
+            <div className="absolute -inset-1.5 bg-gradient-to-r from-[#A4164E] to-[#B8893E] rounded-[1.75rem] blur opacity-30 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+            <div className="relative w-28 h-28 rounded-[1.75rem] overflow-hidden bg-[#FDF1E6] ring-1 ring-[#B8893E]/40 shadow-lg">
               <img
                 src="/logo.png"
-                alt="HM Boutique Logo"
-                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                alt="Bhuvana Bridal and Covering logo"
+                className="block w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>
 
           {/* Title */}
           <h1 className="text-3xl font-serif text-[#A4164E] tracking-tight leading-tight mb-2">
-            HM BOUTIQUE
+            {BRAND_EN}
           </h1>
           <p className="text-[#1C1917]/50 text-xs font-bold uppercase tracking-[0.2em] mb-8">
-            Boutique POS Terminal • School of Fashion Designing & Tailoring
+            Bridal &amp; Covering POS Terminal
           </p>
 
           {/* Form */}
@@ -3304,7 +3304,7 @@ export default function POSBilling() {
 
         {/* Footnote */}
         <div className="mt-6 text-[#1C1917]/30 text-[9px] font-bold tracking-widest uppercase">
-          HM BOUTIQUE Terminal v1.0
+          {BRAND_EN} Terminal v1.0
         </div>
 
         {/* Floating PWA Install Card */}
@@ -3315,7 +3315,7 @@ export default function POSBilling() {
             </div>
             <div className="text-left">
               <div className="text-[11px] font-black uppercase tracking-wider text-white">
-                INSTALL HM BOUTIQUE
+                INSTALL {BRAND_EN.toUpperCase()}
               </div>
               <div className="text-[10px] text-gray-400 font-semibold">
                 POS & Billing App
@@ -3842,12 +3842,12 @@ export default function POSBilling() {
             <div className="flex items-center gap-3">
               <img
                 src="/logo.png"
-                alt="HM Boutique"
-                className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                alt="Bhuvana Bridal and Covering"
+                className="w-11 h-11 rounded-xl object-cover flex-shrink-0 ring-2 ring-white/70"
               />
               <div>
                 <span className="font-black text-sm tracking-tight text-[#FFFFFF] block leading-tight">
-                  HM BOUTIQUE
+                  {BRAND_EN.toUpperCase()}
                 </span>
                 <span className="text-[9px] text-white/80 font-bold tracking-wider block mt-0.5">
                   School of Fashion Designing & Tailoring
@@ -4127,7 +4127,7 @@ export default function POSBilling() {
             )}
             <div>
               <h1 className="text-lg font-black text-[#000000] tracking-tight">
-                HM BOUTIQUE
+                {BRAND_EN.toUpperCase()}
               </h1>
             </div>
           </div>
@@ -8705,7 +8705,7 @@ export default function POSBilling() {
 
         {role === "admin" && activeTab === "inventory" && inventoryView === "products" && (
           <div className="flex-1 flex flex-col max-w-[1400px] mx-auto w-full pb-8 pr-2 animate-in fade-in duration-300">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
+            <div className="flex flex-col gap-4 mb-6">
               <div>
                 <h2 className="text-[28px] font-black text-[#000000] tracking-tight flex items-center gap-3">
                   <Boxes className="w-7 h-7 text-[#A4164E]" />
@@ -8715,13 +8715,13 @@ export default function POSBilling() {
                   Manage products and categories — add, edit and delete.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-                <div className="relative flex-1 lg:flex-none">
+              <div className="flex flex-wrap items-center gap-2 w-full">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="w-3.5 h-3.5 text-[#000000]/40 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Search products…"
-                    className="pl-9 pr-3 py-2 bg-white border border-black/10 rounded-lg text-xs font-semibold focus:outline-none focus:border-[#A4164E] w-full lg:w-48"
+                    className="pl-9 pr-3 py-2 bg-white border border-black/10 rounded-lg text-xs font-semibold focus:outline-none focus:border-[#A4164E] w-full"
                     value={inventorySearch}
                     onChange={(e) => setInventorySearch(e.target.value)}
                   />
@@ -8793,7 +8793,7 @@ export default function POSBilling() {
                     }
                   }}
                   disabled={isSeedingCatalog}
-                  title="Upsert all HM Boutique course packages & patterns into Supabase"
+                  title="Loads the built-in sample catalogue (tailoring course list) into your products"
                   className="text-[10px] font-bold text-white bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-60 px-3 py-2 rounded-lg uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {isSeedingCatalog ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -9406,7 +9406,7 @@ export default function POSBilling() {
         {/* Classy Footer */}
         <footer className="mt-auto pt-10 pb-4 border-t border-black/10 flex flex-col md:flex-row justify-between items-center text-xs font-semibold uppercase tracking-wider gap-4">
           <div className="text-black">
-            © 2026 ALL RIGHTS RESERVED. HM BOUTIQUE.
+            © 2026 ALL RIGHTS RESERVED. {BRAND_EN.toUpperCase()}.
           </div>
           <div className="text-black">
             POWERED BY{" "}

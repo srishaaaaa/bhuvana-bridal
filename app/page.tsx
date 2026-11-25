@@ -7,7 +7,7 @@ export default function Home() {
       {/* Header */}
       <header className="border-b border-[#A4164E]/20 py-4 px-6 sm:px-12 flex justify-between items-center bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-white rounded-xl flex items-center justify-center shadow-xs p-1 border border-[#A4164E]/30 overflow-hidden">
+          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FDF1E6] ring-1 ring-[#B8893E]/40 shadow-xs">
             <img src="/logo.png" alt={`${BRAND_EN} Logo`} className="w-full h-full object-cover" />
           </div>
           <div>
@@ -27,11 +27,11 @@ export default function Home() {
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#A4164E] via-pink-400 to-[#A4164E]" />
 
           <span className="inline-block px-3.5 py-1 bg-[#A4164E]/10 border border-[#A4164E]/30 text-[#A4164E] text-[11px] font-black rounded-full tracking-wider uppercase mb-6">
-            Boutique & Fashion Institute Directory
+            Bridal Wear &amp; Covering
           </span>
 
           <h1 className="text-3xl sm:text-4xl font-black text-[#111111] leading-tight tracking-tight mb-2">
-            HM BOUTIQUE
+            {BRAND_EN}
           </h1>
           <p className="text-xs text-[#A4164E] font-black tracking-widest uppercase mb-2">
             {BRAND_SUBTITLE}
@@ -46,7 +46,7 @@ export default function Home() {
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Specializations</p>
                 <p className="text-[#111111] leading-relaxed">
-                  Tailoring Diploma Courses • Blouse & Salwar Pattern Making • Designer & Bridal Wear • Aari & Embroidery Work • Custom Tailoring & Fittings
+                  Bridal Wear • Designer Collections • Covering • Custom Orders
                 </p>
               </div>
             </div>
@@ -64,7 +64,7 @@ export default function Home() {
             <div className="flex items-start gap-4">
               <MapPin className="w-5 h-5 text-[#A4164E] shrink-0 mt-0.5" />
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Institute Address</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Shop Address</p>
                 <p className="text-[#111111] leading-relaxed">
                   {BRAND_ADDRESS}
                 </p>
@@ -122,7 +122,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-[#A4164E]/20 py-4 text-center bg-white/90">
         <p className="text-[11px] font-black text-[#A4164E] tracking-widest uppercase">
-          HM BOUTIQUE & SCHOOL OF FASHION DESIGNING
+          {BRAND_EN.toUpperCase()}
         </p>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">
           Powered by Cenexa Systems © 2026

@@ -74,7 +74,7 @@ export default function CompactAnalytics({ analytics }: CompactAnalyticsProps) {
               <p className="text-xs text-gray-500 mt-0.5">Completed revenue over time</p>
             </div>
             <div className="inline-flex items-center gap-1 rounded-full bg-[#FFF7EE] border border-[#A4164E]/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#A4164E]">
-              <Sparkles size={12} className="text-[#A4164E]" /> HM Analytics
+              <Sparkles size={12} className="text-[#A4164E]" /> Shop Analytics
             </div>
           </div>
           <div className="h-56">

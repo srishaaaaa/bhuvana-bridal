@@ -239,8 +239,8 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
           <SectionTitle icon={<Store size={18} />} title="Shop Profile" hint="Brand emblem, owner, and business title" />
           <div className="space-y-4">
             <div className="flex items-center gap-4 p-3.5 bg-gray-50/80 rounded-2xl border border-gray-100">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-shopSoft bg-white p-1.5 shadow-sm">
-                <img src={BRAND_LOGO} alt="HM Boutique logo" className="h-full w-full object-contain" />
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#FDF1E6] ring-1 ring-[#B8893E]/40 shadow-sm">
+                <img src={BRAND_LOGO} alt="Bhuvana Bridal and Covering logo" className="block h-full w-full object-cover" />
               </div>
               <div>
                 <p className="text-sm font-bold text-gray-900">Official Brand Logo</p>
