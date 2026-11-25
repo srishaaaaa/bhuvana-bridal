@@ -203,3 +203,15 @@ export function advancePaymentSummary(order: any): string[] {
   }
   return lines;
 }
+
+/** How a UPI payment arrived (e.g. "Counter QR"), or "" when not recorded. */
+export function upiViaOf(order: any): string {
+  if (!order) return '';
+  if (order.upi_via) return String(order.upi_via);
+  try {
+    const d = typeof order.split_details === 'string' ? JSON.parse(order.split_details) : order.split_details;
+    return d?.upi_via ? String(d.upi_via) : '';
+  } catch {
+    return '';
+  }
+}

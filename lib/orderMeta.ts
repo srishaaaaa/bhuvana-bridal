@@ -33,6 +33,8 @@ export interface OrderMeta {
   advanceGpay: number;
   taxMode: string;
   settle: SettlementInfo | null;
+  /** How a UPI payment arrived (Counter QR, WhatsApp payment link, ...) */
+  upiVia: string;
 }
 
 function parseDetails(raw: any): Record<string, any> {
@@ -68,6 +70,7 @@ export function readOrderMeta(row: any): OrderMeta {
     advanceCash: num(d.advance_cash) ?? 0,
     advanceGpay: num(d.advance_gpay) ?? 0,
     taxMode: String(d.tax_mode || '').toLowerCase(),
+    upiVia: String(d.upi_via || ''),
     settle: s
       ? {
           mode: (String(s.mode || 'CASH').toUpperCase() as SettleMode),
@@ -93,6 +96,7 @@ export function buildSplitDetails(input: {
   advanceGpay?: number;
   taxMode?: string;
   settle?: SettlementInfo;
+  upiVia?: string;
 }): Record<string, any> {
   const base = { ...parseDetails(input.existing) };
   if (input.cash !== undefined) base.cash = Number(input.cash) || 0;
@@ -106,6 +110,7 @@ export function buildSplitDetails(input: {
   if (input.advanceGpay !== undefined) base.advance_gpay = Number(input.advanceGpay) || 0;
   if (input.taxMode) base.tax_mode = String(input.taxMode).toLowerCase();
   if (input.settle) base.settle = input.settle;
+  if (input.upiVia) base.upi_via = String(input.upiVia);
   return base;
 }
 
@@ -126,6 +131,7 @@ export function metaToOrderFields(row: any) {
     advance_mode: m.advanceMode,
     advance_cash: m.advanceCash,
     advance_gpay: m.advanceGpay,
+    upi_via: m.upiVia || null,
   };
   if (m.taxMode) {
     out.tax_mode = m.taxMode;

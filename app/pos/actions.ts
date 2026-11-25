@@ -178,6 +178,7 @@ export async function submitOrder(payload: {
   remarks?: string | null;
   referenceNumber?: string | null;
   creditDueDate?: string | null;
+  upiVia?: string | null;
 }): Promise<{ orderId: string; id?: string; invoiceNo?: string }> {
   const result = await dbStore.submitOrder(payload);
   await recordCouponUse(payload.couponCode);
@@ -462,6 +463,10 @@ export async function saveStoreSettings(settings: {
   instagramId: string;
   logoUrl?: string;
   cardColor?: string;
+  upiId?: string;
+  upiPayeeName?: string;
+  gpayNumber?: string;
+  upiMessage?: string;
 }) {
   if (!isSupabaseConfigured) return { success: false, error: 'Database not connected' };
   try {
@@ -476,6 +481,10 @@ export async function saveStoreSettings(settings: {
       instagram_id: settings.instagramId,
       logo_url: settings.logoUrl || '/logo.png',
       card_color: settings.cardColor || '#A4164E',
+      upi_id: (settings.upiId || '').trim(),
+      upi_payee_name: (settings.upiPayeeName || '').trim(),
+      gpay_number: (settings.gpayNumber || '').trim(),
+      upi_message: settings.upiMessage || null,
       updated_at: new Date().toISOString(),
     };
 

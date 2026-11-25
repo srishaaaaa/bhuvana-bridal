@@ -4,7 +4,7 @@ import React from "react";
 import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, BRAND_EMAIL, DEFAULT_INVOICE_TERMS } from "@/lib/brand";
 import { formatINR } from "@/lib/money";
 import { getOrderTotals, numberToWords } from "@/lib/orderTotals";
-import { buildPaymentRows, paymentModeLabel } from "@/lib/paymentRows";
+import { buildPaymentRows, paymentModeLabel, upiViaOf } from "@/lib/paymentRows";
 import InvoiceTotalsBlock from "./InvoiceTotalsBlock";
 
 export interface PrintableReceiptItem {
@@ -317,7 +317,7 @@ export default function PrintableReceipt({ order, paper, size }: PrintableReceip
         </div>
 
         <div className="text-[10px] space-y-1 mb-2">
-          <p className="font-semibold text-center border-b border-dashed border-black/30 pb-1 mb-1">{paymentLabel}</p>
+          <p className="font-semibold text-center border-b border-dashed border-black/30 pb-1 mb-1">{paymentLabel}{upiViaOf(order) ? ` · via ${upiViaOf(order)}` : ""}</p>
           <p className="text-[9px] uppercase tracking-wider text-center text-black leading-snug">{numberToWords(totals.grandTotal)}</p>
         </div>
 
@@ -404,7 +404,7 @@ export default function PrintableReceipt({ order, paper, size }: PrintableReceip
           </p>
           <p className="text-xs text-zinc-500 mt-0.5">{formattedDate}</p>
           <p className="text-xs text-zinc-500 mt-0.5 uppercase">
-            Mode: {paymentModeLabel(order)}
+            Mode: {paymentModeLabel(order)}{upiViaOf(order) ? ` · via ${upiViaOf(order)}` : ""}
           </p>
         </div>
       </div>

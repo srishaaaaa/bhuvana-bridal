@@ -18,7 +18,27 @@ export interface ShopProfile {
   address: string
   instagramId: string
   logoUrl: string
+  /** UPI ID (VPA) that QR codes and payment links pay to, e.g. 6383950458@okaxis */
+  upiId: string
+  /** Name shown in the customer's UPI app; blank = shop name */
+  upiPayeeName: string
+  /** Number customers can pay on GPay directly */
+  gpayNumber: string
+  /** WhatsApp message for UPI payment requests */
+  upiMessage: string
 }
+
+export const DEFAULT_UPI_MESSAGE = `Hi {name}, thank you for shopping at {shop}! 🌸
+
+Your bill amount is *₹{amount}*.
+
+Tap to pay by UPI:
+{link}
+
+UPI ID: {upi}
+GPay number: {gpay}
+
+Please share the payment screenshot once done. 🙏`
 
 /** Fallback used before settings load. */
 export const DEFAULT_SHOP_PROFILE: ShopProfile = {
@@ -31,6 +51,10 @@ export const DEFAULT_SHOP_PROFILE: ShopProfile = {
   address: 'Ground floor, No. 8/24, Indhira Gandhi Road, Pallavaram',
   instagramId: 'bhuvana_bridal_covering',
   logoUrl: '/logo.png',
+  upiId: '',
+  upiPayeeName: '',
+  gpayNumber: '63839 50458',
+  upiMessage: DEFAULT_UPI_MESSAGE,
 }
 
 export const DEFAULT_LOGO = '/logo.png'
@@ -89,6 +113,10 @@ export let BRAND_ADDRESS = DEFAULT_SHOP_PROFILE.address
 export const BRAND_LOCATION_LINK = '#'
 export let BRAND_INSTAGRAM = toInstagramHandle(DEFAULT_SHOP_PROFILE.instagramId)
 export let BRAND_INSTAGRAM_LINK = toInstagramLink(DEFAULT_SHOP_PROFILE.instagramId)
+export let BRAND_UPI_ID = DEFAULT_SHOP_PROFILE.upiId
+export let BRAND_UPI_PAYEE = DEFAULT_SHOP_PROFILE.name
+export let BRAND_GPAY_NUMBER = DEFAULT_SHOP_PROFILE.gpayNumber
+export let BRAND_UPI_MESSAGE = DEFAULT_SHOP_PROFILE.upiMessage
 
 /** Maps a store_settings row (snake_case or camelCase) to a ShopProfile. */
 export const profileFromSettings = (row: any): ShopProfile => ({
@@ -101,6 +129,10 @@ export const profileFromSettings = (row: any): ShopProfile => ({
   address: row?.address ?? DEFAULT_SHOP_PROFILE.address,
   instagramId: row?.instagram_id ?? row?.instagramId ?? DEFAULT_SHOP_PROFILE.instagramId,
   logoUrl: row?.logo_url || row?.logoUrl || DEFAULT_SHOP_PROFILE.logoUrl,
+  upiId: row?.upi_id ?? row?.upiId ?? DEFAULT_SHOP_PROFILE.upiId,
+  upiPayeeName: row?.upi_payee_name ?? row?.upiPayeeName ?? DEFAULT_SHOP_PROFILE.upiPayeeName,
+  gpayNumber: row?.gpay_number ?? row?.gpayNumber ?? DEFAULT_SHOP_PROFILE.gpayNumber,
+  upiMessage: row?.upi_message || row?.upiMessage || DEFAULT_SHOP_PROFILE.upiMessage,
 })
 
 /** True when the given profile differs from what this browser has cached. */
@@ -132,6 +164,10 @@ export const applyShopProfile = (profile: Partial<ShopProfile>, cache = true) =>
   BRAND_ADDRESS = next.address || ''
   BRAND_INSTAGRAM = toInstagramHandle(next.instagramId)
   BRAND_INSTAGRAM_LINK = toInstagramLink(next.instagramId)
+  BRAND_UPI_ID = (next.upiId || '').trim()
+  BRAND_UPI_PAYEE = (next.upiPayeeName || '').trim() || BRAND_EN
+  BRAND_GPAY_NUMBER = (next.gpayNumber || '').trim()
+  BRAND_UPI_MESSAGE = next.upiMessage || DEFAULT_UPI_MESSAGE
 
   if (cache && typeof window !== 'undefined') {
     try {

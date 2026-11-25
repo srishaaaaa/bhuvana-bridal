@@ -656,3 +656,13 @@ END $$;
 INSERT INTO public.birthday_offers (label)
 SELECT '10% off on your next purchase'
 WHERE NOT EXISTS (SELECT 1 FROM public.birthday_offers);
+
+
+-- ----------------------------------------------------------------------------
+-- I. UPI PAYMENTS (same as supabase_upi_migration.sql)
+-- ----------------------------------------------------------------------------
+-- UPI payment settings (Store Settings -> UPI Payments). Safe to run more than once.
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS upi_id          TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS upi_payee_name  TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS gpay_number     TEXT;
+ALTER TABLE public.store_settings ADD COLUMN IF NOT EXISTS upi_message     TEXT;

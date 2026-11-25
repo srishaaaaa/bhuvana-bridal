@@ -1,7 +1,7 @@
 "use client";
 
 import { summarizeCashflow, dedupeAdvance, allocatePayment } from "@/lib/paymentSplit";
-import { buildPaymentRows, paymentModeLabel, advancePaymentSummary } from "@/lib/paymentRows";
+import { buildPaymentRows, paymentModeLabel, advancePaymentSummary, upiViaOf } from "@/lib/paymentRows";
 import ExpenseCategoryManager, { type CategoryChanges } from "@/app/components/ExpenseCategoryManager";
 import { loadExpenseCategories, applyCategoryChanges as saveCategoryChanges, DEFAULT_EXPENSE_CATEGORIES } from "@/lib/expenseCategories";
 import { buildXlsx, buildXlsxMulti, type XlsxCell } from "@/lib/xlsx";
@@ -105,6 +105,8 @@ import OverdueTaskAlarmModal from "@/app/components/OverdueTaskAlarmModal";
 import StockAdjustmentModal from "@/app/components/StockAdjustmentModal";
 import StockMovements from "@/app/components/StockMovements";
 import Birthdays from "@/app/components/Birthdays";
+import UpiPaymentPanel from "@/app/components/UpiPaymentPanel";
+import type { UpiVia } from "@/lib/upi";
 import { CreateBarcodeModal } from "@/app/components/barcode/CreateBarcodeModal";
 import { BarcodeScannerInput, type ScannedItemPayload } from "@/app/components/barcode/BarcodeScannerInput";
 import { BarcodeRedirectDialog } from "@/app/components/barcode/BarcodeRedirectDialog";
@@ -523,6 +525,7 @@ export default function POSBilling() {
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [cashReceived, setCashReceived] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<OrderPaymentMode>("CASH");
+  const [upiVia, setUpiVia] = useState<UpiVia>("Counter QR");
   const [creditDueDate, setCreditDueDate] = useState<string>("");
   // Split payment: cash + gpay portions (only used when paymentMode === "SPLIT")
   const [splitCash, setSplitCash] = useState<number>(0);
@@ -1600,6 +1603,7 @@ export default function POSBilling() {
       setCustomerPhone("");
       setCustomerAddress("");
       setCustomerBirthday("");
+      setUpiVia("Counter QR");
       setDiscountValue(0);
       setDeliveryFee(0);
       setCashReceived(0);
@@ -1981,6 +1985,7 @@ export default function POSBilling() {
         splitGpay: splitGpayVal,
         paymentMode: paymentMode,
         creditDueDate: paymentMode === "CREDIT" ? (creditDueDate || null) : null,
+        upiVia: paymentMode === "GPAY" ? upiVia : null,
         couponCode: appliedCoupon?.code || null,
         taxMode,
         manualDiscountAmount: localTotals.manualDiscount,
@@ -2001,6 +2006,7 @@ export default function POSBilling() {
         phone: customerPhone,
         customerAddress: customerAddress.trim() || null,
         customer_address: customerAddress.trim() || null,
+        upi_via: paymentMode === "GPAY" ? upiVia : null,
         source: isOnline ? "ONLINE" : "OFFLINE",
         isGst: Boolean(applyGST),
         items: itemsToSave.map((i, idx) => ({
@@ -2067,6 +2073,7 @@ export default function POSBilling() {
       setCustomerPhone("");
       setCustomerAddress("");
       setCustomerBirthday("");
+      setUpiVia("Counter QR");
       setCreditDueDate("");
       setCustomOrderDate(new Date().toISOString().split("T")[0]);
       setItemMeasurements({});
@@ -3080,7 +3087,7 @@ export default function POSBilling() {
         r2(t.sgst),
         r2(t.deliveryFee),
         r2(t.grandTotal),
-        paymentModeLabel(o),
+        paymentModeLabel(o) + (upiViaOf(o) ? ` (${upiViaOf(o)})` : ""),
         r2(pay.cash),
         r2(pay.gpay),
         r2(pay.card),
@@ -5267,6 +5274,7 @@ export default function POSBilling() {
                                   setAdvDeliveryDate("");
                                   setAdvNotes("");
                                 }
+                                if (mode === "GPAY") setCashReceived(0);
                                 setPaymentMode(mode);
                               }}
                               className={`py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all cursor-pointer border ${
@@ -5275,7 +5283,7 @@ export default function POSBilling() {
                                   : "bg-white text-[#000000] border-black/10 hover:border-[#A4164E]"
                               }`}
                             >
-                              {mode === "GPAY" ? "GPay" : mode === "SPLIT" ? "Split" : mode === "CREDIT" ? "Credit" : mode}
+                              {mode === "GPAY" ? "UPI" : mode === "SPLIT" ? "Split" : mode === "CREDIT" ? "Credit" : mode}
                             </button>
                           ))}
                         </div>
@@ -5394,6 +5402,15 @@ export default function POSBilling() {
                             </div>
                           )}
                         </div>
+                      ) : paymentMode === "GPAY" ? (
+                        <UpiPaymentPanel
+                          amount={grandTotal}
+                          customerName={customerName}
+                          customerPhone={customerPhone}
+                          upiVia={upiVia}
+                          onUpiViaChange={setUpiVia}
+                          onOpenSettings={() => setActiveTab("store_settings")}
+                        />
                       ) : (
                         <div className="bg-[#FFFFFF]/40 border border-black/10 rounded-xl p-4 mt-2">
                           <span className="block text-[9px] font-bold text-[#000000] uppercase tracking-wider mb-0.5">

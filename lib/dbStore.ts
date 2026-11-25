@@ -1155,6 +1155,7 @@ export const dbStore = {
     advanceCash?: number;
     advanceGpay?: number;
     settlePayment?: { mode: 'CASH' | 'GPAY' | 'SPLIT'; cash: number; gpay: number; amount: number; at?: string };
+    upiVia?: string | null;
     remarks?: string | null;
     referenceNumber?: string | null;
     creditDueDate?: string | null;
@@ -1226,6 +1227,9 @@ export const dbStore = {
             advanceCash: payload.advanceCash,
             advanceGpay: payload.advanceGpay,
             settle: payload.settlePayment,
+            upiVia: payload.paymentMode === 'GPAY' || (payload.paymentMode === 'SPLIT' && Number(payload.splitGpay) > 0)
+              ? payload.upiVia || undefined
+              : undefined,
           }),
           coupon_code: payload.couponCode || null,
           items: structuredItems,

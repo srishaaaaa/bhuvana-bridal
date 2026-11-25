@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AtSign, RotateCcw, Save, Store, Sparkles, Check, Phone, Mail, MapPin } from 'lucide-react';
+import { AtSign, RotateCcw, Save, Store, Sparkles, Check, Phone, Mail, MapPin, QrCode } from 'lucide-react';
 import {
   BRAND_ADDRESS,
   BRAND_EMAIL,
@@ -15,7 +15,9 @@ import {
   toInstagramLink,
   applyShopProfile,
   profileFromSettings,
+  DEFAULT_UPI_MESSAGE,
 } from '@/lib/brand';
+import { buildUpiLink, fillUpiMessage, isValidUpiId } from '@/lib/upi';
 import { fetchStoreSettings, saveStoreSettings } from '@/app/pos/actions';
 
 type FormState = {
@@ -29,6 +31,10 @@ type FormState = {
   address: string;
   instagramId: string;
   cardColor: string;
+  upiId: string;
+  upiPayeeName: string;
+  gpayNumber: string;
+  upiMessage: string;
 };
 
 const toForm = (settings: any): FormState => ({
@@ -42,6 +48,10 @@ const toForm = (settings: any): FormState => ({
   address: settings?.address || DEFAULT_SHOP_PROFILE.address,
   instagramId: settings?.instagram_id || settings?.instagramId || DEFAULT_SHOP_PROFILE.instagramId,
   cardColor: settings?.card_color || settings?.cardColor || '#A4164E',
+  upiId: settings?.upi_id ?? DEFAULT_SHOP_PROFILE.upiId,
+  upiPayeeName: settings?.upi_payee_name ?? DEFAULT_SHOP_PROFILE.upiPayeeName,
+  gpayNumber: settings?.gpay_number ?? DEFAULT_SHOP_PROFILE.gpayNumber,
+  upiMessage: settings?.upi_message || DEFAULT_UPI_MESSAGE,
 });
 
 const digitsOf = (value: string) => value.replace(/\D/g, '');
@@ -127,6 +137,10 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
 
     if (!form.address.trim()) errs.address = 'Shop address is required';
 
+    if (form.upiId.trim() && !isValidUpiId(form.upiId)) errs.upiId = 'Enter a valid UPI ID, e.g. 6383950458@okaxis';
+    const gDigits = digitsOf(form.gpayNumber);
+    if (gDigits && (gDigits.length < 10 || gDigits.length > 15)) errs.gpayNumber = 'Enter a valid 10-digit number';
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -151,6 +165,10 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
         instagramId: form.instagramId,
         logoUrl: BRAND_LOGO,
         cardColor: '#A4164E',
+        upiId: form.upiId,
+        upiPayeeName: form.upiPayeeName,
+        gpayNumber: form.gpayNumber,
+        upiMessage: form.upiMessage,
       });
 
       if (res.success) {
@@ -335,6 +353,85 @@ export default function StoreSettings({ productsCount = 221, categoriesList = []
                 <span>Visit Instagram Profile: {instagramLink}</span>
               </a>
             )}
+          </div>
+        </div>
+
+        {/* UPI PAYMENTS */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm xl:col-span-2">
+          <SectionTitle
+            icon={<QrCode size={18} />}
+            title="UPI Payments"
+            hint="Used for the billing QR code and the WhatsApp payment link"
+          />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Field label="UPI ID (where money is received)" error={errors.upiId}>
+              <input
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-black outline-none transition-colors focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/25"
+                value={form.upiId}
+                onChange={e => set('upiId', e.target.value.trim())}
+                placeholder="e.g. 6383950458@okaxis"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </Field>
+            <Field label="Payee Name (shown in UPI app)">
+              <input
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-black outline-none transition-colors focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/25"
+                value={form.upiPayeeName}
+                onChange={e => set('upiPayeeName', e.target.value)}
+                placeholder={form.name || 'Bhuvana Bridal and Covering'}
+              />
+            </Field>
+            <Field label="GPay Number" error={errors.gpayNumber}>
+              <input
+                type="tel"
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-black outline-none transition-colors focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/25"
+                value={form.gpayNumber}
+                onChange={e => set('gpayNumber', e.target.value)}
+                placeholder="63839 50458"
+              />
+            </Field>
+          </div>
+
+          {!form.upiId.trim() && (
+            <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800">
+              Add your UPI ID to show a scan-to-pay QR in billing and to send UPI payment links.
+            </p>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Field label="WhatsApp Payment Message">
+              <textarea
+                rows={10}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-black outline-none transition-colors focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/25"
+                value={form.upiMessage}
+                onChange={e => set('upiMessage', e.target.value)}
+              />
+              <span className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-medium text-gray-500">
+                <span>
+                  Use <b>{'{name}'}</b>, <b>{'{amount}'}</b>, <b>{'{shop}'}</b>, <b>{'{link}'}</b>, <b>{'{upi}'}</b>, <b>{'{gpay}'}</b>, <b>{'{bill}'}</b>.
+                </span>
+                <button type="button" onClick={() => set('upiMessage', DEFAULT_UPI_MESSAGE)} className="font-bold text-[#A4164E] hover:underline">
+                  Reset to default
+                </button>
+              </span>
+            </Field>
+            <div>
+              <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-800">Message Preview</span>
+              <div className="whitespace-pre-wrap break-words rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-gray-900">
+                {fillUpiMessage(form.upiMessage, {
+                  name: 'Priya',
+                  amount: 2500,
+                  shop: form.name,
+                  upiId: form.upiId,
+                  gpayNumber: form.gpayNumber,
+                  link: form.upiId.trim() && isValidUpiId(form.upiId)
+                    ? buildUpiLink({ upiId: form.upiId, payee: form.upiPayeeName || form.name, amount: 2500, note: 'Bill INV-0001' })
+                    : '(add your UPI ID)',
+                  bill: 'INV-0001',
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
