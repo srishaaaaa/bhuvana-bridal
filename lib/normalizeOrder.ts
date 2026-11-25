@@ -5,6 +5,7 @@ import { ORDER_STATUS } from './orderStatus';
 import { isUuid } from './ids';
 
 import { getOrderTotals } from './orderTotals';
+import { whatsappNumber, whatsappUrl } from './whatsapp';
 
 export function normalizeOrder(r: any) {
   if (!r) return null;
@@ -131,9 +132,7 @@ export function normalizeOrder(r: any) {
 }
 
 export function waLink(phone: string, text: string): string | null {
-  let d = (phone || '').replace(/\D/g, '').replace(/^0+/, '');
-  if (d.length === 10) d = '91' + d;
-  return d.length < 11 ? null : `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
+  return whatsappNumber(phone) ? whatsappUrl(phone, text) : null;
 }
 
 export function formatDDMMYYYY(dateStr: string | null | undefined): string {

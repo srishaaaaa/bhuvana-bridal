@@ -76,7 +76,7 @@ const readCachedProfile = (): ShopProfile => {
   }
 }
 
-/** Digits-only form for tel:/wa.me links, defaulting to the +91 country code. */
+/** Digits-only form for tel: and WhatsApp links, defaulting to the +91 country code. */
 export const toE164 = (display: string): string => {
   const digits = (display || '').replace(/\D/g, '')
   if (!digits) return ''
@@ -107,7 +107,7 @@ export let BRAND_PHONE_DISPLAY = DEFAULT_SHOP_PROFILE.phone
 export let BRAND_PHONE_E164 = toE164(DEFAULT_SHOP_PROFILE.phone)
 export let BRAND_WHATSAPP = DEFAULT_SHOP_PROFILE.shopContact
 export let WHATSAPP_NUM = toE164(DEFAULT_SHOP_PROFILE.shopContact)
-export let BRAND_WHATSAPP_LINK = `https://wa.me/${toE164(DEFAULT_SHOP_PROFILE.shopContact)}`
+export let BRAND_WHATSAPP_LINK = `https://api.whatsapp.com/send?phone=${toE164(DEFAULT_SHOP_PROFILE.shopContact)}`
 export let BRAND_EMAIL = DEFAULT_SHOP_PROFILE.email
 export let BRAND_ADDRESS = DEFAULT_SHOP_PROFILE.address
 export const BRAND_LOCATION_LINK = '#'
@@ -158,7 +158,7 @@ export const applyShopProfile = (profile: Partial<ShopProfile>, cache = true) =>
   BRAND_PHONE_E164 = BRAND_PRIMARY_PHONE_E164
   BRAND_WHATSAPP = BRAND_SECONDARY_PHONE_DISPLAY
   WHATSAPP_NUM = BRAND_SECONDARY_PHONE_E164
-  BRAND_WHATSAPP_LINK = `https://wa.me/${BRAND_SECONDARY_PHONE_E164}`
+  BRAND_WHATSAPP_LINK = `https://api.whatsapp.com/send?phone=${BRAND_SECONDARY_PHONE_E164}`
 
   BRAND_EMAIL = next.email || ''
   BRAND_ADDRESS = next.address || ''

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { MessageCircle, QrCode, Settings } from 'lucide-react';
-import { BRAND_EN, BRAND_GPAY_NUMBER, BRAND_UPI_ID, BRAND_UPI_MESSAGE, BRAND_UPI_PAYEE, toE164 } from '@/lib/brand';
+import { BRAND_EN, BRAND_GPAY_NUMBER, BRAND_UPI_ID, BRAND_UPI_MESSAGE, BRAND_UPI_PAYEE } from '@/lib/brand';
 import {
   UPI_VIA_OPTIONS,
   buildPayPageLink,
@@ -15,6 +15,7 @@ import {
   siteBaseUrl,
   type UpiVia,
 } from '@/lib/upi';
+import { whatsappUrl } from '@/lib/whatsapp';
 
 const QR_LIFETIME_SECONDS = 120;
 
@@ -112,7 +113,7 @@ export default function UpiPaymentPanel({
       gpayNumber: BRAND_GPAY_NUMBER,
       bill: note,
     });
-    window.open(`https://wa.me/${toE164(digits)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    window.open(whatsappUrl(digits, text), '_blank', 'noopener');
     onUpiViaChange('WhatsApp payment link');
   };
 

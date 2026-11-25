@@ -13,7 +13,8 @@ import {
   type BirthdayCustomer,
   type BirthdayOffer,
 } from '@/app/pos/birthdayActions';
-import { BRAND_EN, BRAND_PHONE_DISPLAY, BRAND_INSTAGRAM, toE164 } from '@/lib/brand';
+import { BRAND_EN, BRAND_PHONE_DISPLAY, BRAND_INSTAGRAM } from '@/lib/brand';
+import { whatsappUrl } from '@/lib/whatsapp';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const SHORT = MONTHS.map(m => m.slice(0, 3));
@@ -205,7 +206,7 @@ export default function Birthdays() {
 
   const sendOffer = (c: BirthdayCustomer) => {
     const text = fillTemplate(message, c.name, currentOffer);
-    window.open(`https://wa.me/${toE164(c.phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    window.open(whatsappUrl(c.phone, text), '_blank', 'noopener');
   };
 
   const saveOffer = async () => {

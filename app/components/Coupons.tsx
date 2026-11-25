@@ -9,8 +9,9 @@ import {
   toggleCouponActive,
   recordCouponSent,
 } from '@/app/pos/actions';
-import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, toE164 } from '@/lib/brand';
+import { BRAND_EN, BRAND_ADDRESS, BRAND_PHONE_DISPLAY } from '@/lib/brand';
 import { isPrivateAddress, siteBaseUrl } from '@/lib/upi';
+import { whatsappUrl } from '@/lib/whatsapp';
 
 export interface CouponItem {
   id: number;
@@ -178,7 +179,7 @@ export default function Coupons() {
 
   /** Opens WhatsApp's contact picker so the coupon can go to any chats, groups or broadcast lists. */
   const shareEveryone = async (c: CouponItem) => {
-    window.open(`https://wa.me/?text=${encodeURIComponent(buildMessage(c))}`, '_blank', 'noopener');
+    window.open(whatsappUrl(null, buildMessage(c)), '_blank', 'noopener');
     await recordCouponSent(c.id, null);
     await loadCoupons();
   };
@@ -196,7 +197,7 @@ export default function Coupons() {
     if (digits.length < 10) return setSendError('Enter a valid 10-digit mobile number');
     const res = await recordCouponSent(sendTarget.id, digits);
     if (!res.success) return setSendError(res.error || 'Could not record this send');
-    window.open(`https://wa.me/${toE164(digits)}?text=${encodeURIComponent(buildMessage(sendTarget, sendName))}`, '_blank', 'noopener');
+    window.open(whatsappUrl(digits, buildMessage(sendTarget, sendName)), '_blank', 'noopener');
     setSendTarget(null);
     await loadCoupons();
   };
