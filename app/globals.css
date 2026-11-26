@@ -78,6 +78,10 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+@theme inline {
+  --font-serif: var(--font-display), Georgia, "Times New Roman", serif;
+}
+
 @theme {
   --color-primary: #A4164E;
   --color-secondary: #A4164E;

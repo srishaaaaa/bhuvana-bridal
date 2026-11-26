@@ -336,7 +336,7 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
             disabled={disabled || loading}
-            className="w-full pl-10 pr-24 py-3 rounded-2xl border-2 border-[#C9A063]/50 bg-white font-bold text-sm text-[#1F1F1F] placeholder:text-gray-400 outline-none focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/10 shadow-xs transition-all"
+            className="w-full pl-10 pr-24 py-3 rounded-2xl border-2 border-[#C9A063]/50 bg-white font-medium text-sm text-[#1F1F1F] placeholder:text-gray-400 outline-none focus:border-[#A4164E] focus:ring-2 focus:ring-[#A4164E]/10 shadow-xs transition-all"
           />
 
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -344,7 +344,7 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="px-3 py-1.5 rounded-xl bg-[#A4164E] text-white hover:bg-[#85103E] text-xs font-black cursor-pointer shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-[#A4164E] text-white hover:bg-[#85103E] text-xs font-semibold cursor-pointer shadow-xs"
               >
                 {loading ? '...' : 'Add'}
               </button>
@@ -363,15 +363,15 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
 
       {/* Success Notification Pill */}
       {lastScannedName && (
-        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full animate-in fade-in duration-150">
+        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full animate-in fade-in duration-150">
           <Sparkles size={13} className="text-emerald-600" />
-          Added: <span className="font-black text-black">{lastScannedName}</span> (+1 qty)
+          Added: <span className="font-semibold text-black">{lastScannedName}</span> (+1 qty)
         </div>
       )}
 
       {/* Error Notification Pill */}
       {errorMsg && (
-        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-800 bg-rose-50 border border-rose-300 px-3 py-1 rounded-full animate-in fade-in duration-150">
+        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-800 bg-rose-50 border border-rose-300 px-3 py-1 rounded-full animate-in fade-in duration-150">
           <AlertCircle size={13} className="text-rose-600" />
           {errorMsg}
         </div>
@@ -389,7 +389,7 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
             <div className="px-5 py-4 border-b border-[#C9A063]/40 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Camera size={18} className="text-[#F6E3B4]" />
-                <span className="font-black text-sm text-white">Camera Barcode Scanner</span>
+                <span className="text-base font-serif font-semibold tracking-normal text-white">Camera Barcode Scanner</span>
               </div>
               <button
                 onClick={handleCloseCamera}
@@ -414,7 +414,7 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
                   <select
                     value={selectedDeviceId}
                     onChange={(e) => setSelectedDeviceId(e.target.value)}
-                    className="w-full bg-[#85103E] border border-gray-700 text-xs font-bold text-white rounded-lg px-2 py-1.5 outline-none focus:border-[#A4164E]"
+                    className="w-full bg-[#85103E] border border-gray-700 text-xs font-medium text-white rounded-lg px-2 py-1.5 outline-none focus:border-[#A4164E]"
                   >
                     {videoDevices.map((d) => (
                       <option key={d.deviceId} value={d.deviceId}>
@@ -425,7 +425,7 @@ export const BarcodeScannerInput: React.FC<BarcodeScannerInputProps> = ({
                 </div>
               )}
 
-              <p className="text-xs text-[#F6E3B4] mt-3 text-center font-bold">
+              <p className="text-xs text-[#F6E3B4] mt-3 text-center font-medium">
                 Align the red line with the barcode sticker on the product
               </p>
             </div>

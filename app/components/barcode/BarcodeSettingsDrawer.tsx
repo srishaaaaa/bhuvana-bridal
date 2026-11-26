@@ -92,7 +92,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
           <div className="relative z-10 w-full max-w-sm bg-white h-[100dvh] max-h-[100dvh] shadow-2xl flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-200">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#C9A063]/40 bg-gradient-to-r from-[#A4164E] to-[#5E0B2B] text-white shrink-0">
-            <h3 className="text-sm font-black tracking-wide text-white">Barcode Settings</h3>
+            <h3 className="text-lg font-serif font-semibold tracking-normal text-white">Barcode Settings</h3>
             <button
               type="button"
               onClick={onClose}
@@ -107,15 +107,15 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
             {/* Section 1: Printer */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black uppercase tracking-wider text-gray-800">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-800">
                   Printer
                 </span>
-                <span className="text-[10px] text-gray-400 font-bold italic">
+                <span className="text-[10px] text-gray-400 font-medium italic">
                   Select any 1 option
                 </span>
               </div>
               <div className="space-y-2 bg-[#FAFAFA] p-3 rounded-xl border border-gray-200">
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="radio"
                     name="printerType"
@@ -125,7 +125,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                   />
                   Label Printer (Thermal)
                 </label>
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="radio"
                     name="printerType"
@@ -141,10 +141,10 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
             {/* Section 2: Size */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black uppercase tracking-wider text-gray-800">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-800">
                   Size
                 </span>
-                <span className="text-[10px] text-gray-400 font-bold italic">
+                <span className="text-[10px] text-gray-400 font-medium italic">
                   Select any 1 option
                 </span>
               </div>
@@ -152,7 +152,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                 {allSizes.map((size) => (
                   <div
                     key={size.id}
-                    className="flex items-center justify-between gap-2 text-xs font-bold text-gray-700 hover:text-black"
+                    className="flex items-center justify-between gap-2 text-xs font-medium text-gray-700 hover:text-black"
                   >
                     <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
                       <input
@@ -166,7 +166,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                     </label>
                     {size.isCustom && (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[9px] font-black uppercase tracking-wider bg-[#A4164E] text-white px-1.5 py-0.5 rounded">
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.08em] bg-[#A4164E] text-white px-1.5 py-0.5 rounded">
                           Custom
                         </span>
                         <button
@@ -188,7 +188,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowCustomModal(true)}
-                  className="mt-2 flex items-center gap-1.5 text-xs font-black text-gray-600 hover:text-gray-800 hover:underline pt-2 border-t border-gray-200 w-full cursor-pointer"
+                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:underline pt-2 border-t border-gray-200 w-full cursor-pointer"
                 >
                   <Plus size={13} />
                   Create Custom Size <Info size={12} className="text-gray-400" />
@@ -199,12 +199,12 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
             {/* Section 3: Additional Fields */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-black uppercase tracking-wider text-gray-800">
+                <span className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-800">
                   Additional Fields
                 </span>
               </div>
               <div className="space-y-2.5 bg-[#FAFAFA] p-3 rounded-xl border border-gray-200">
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showSalePrice}
@@ -213,7 +213,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                   />
                   Sale Price (₹)
                 </label>
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showCompanyName}
@@ -222,7 +222,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                   />
                   Company Name ({BRAND_EN})
                 </label>
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showItemName}
@@ -231,7 +231,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
                   />
                   Item Name
                 </label>
-                <label className="flex items-center gap-2.5 text-xs font-bold text-gray-700 cursor-pointer">
+                <label className="flex items-center gap-2.5 text-xs font-medium text-gray-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={settings.showDiscount}
@@ -249,7 +249,7 @@ export const BarcodeSettingsDrawer: React.FC<BarcodeSettingsDrawerProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-[#A4164E] text-white border border-[#A4164E] font-black text-xs uppercase tracking-wider hover:bg-[#85103E] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              className="w-full py-2.5 rounded-xl bg-[#A4164E] text-white border border-[#A4164E] font-semibold text-xs uppercase tracking-[0.08em] hover:bg-[#85103E] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
               <Check size={14} /> Done
             </button>

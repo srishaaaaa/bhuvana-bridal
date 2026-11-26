@@ -97,7 +97,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-[#C9A063]/40 bg-gradient-to-r from-[#A4164E] to-[#5E0B2B] text-white shrink-0">
           <div>
-            <h3 className="text-sm sm:text-base font-black tracking-wide text-white">Print Preview</h3>
+            <h3 className="text-lg sm:text-xl font-serif font-semibold tracking-normal text-white">Print Preview</h3>
             <p className="text-[11px] sm:text-xs text-[#F6E3B4] font-semibold">
               {individualLabels.length} Labels (1 Barcode Per Page • {sizeConfig.name} • {sizeConfig.widthMm} × {sizeConfig.heightMm} mm)
             </p>
@@ -119,7 +119,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
           <div className="flex flex-wrap items-center justify-center gap-4 w-full">
             {individualLabels.map((label, idx) => (
               <div key={`${label.id}-${idx}`} className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-gray-500 mb-1.5 font-mono">
+                <span className="text-[10px] font-medium text-gray-500 mb-1.5 font-mono">
                   Page {idx + 1}
                 </span>
                 <div
@@ -133,7 +133,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                   {/* Header */}
                   {label.header && (
                     <span
-                      className="font-black uppercase tracking-wider text-gray-900 leading-none truncate max-w-[90%]"
+                      className="font-semibold uppercase tracking-[0.08em] text-gray-900 leading-none truncate max-w-[90%]"
                       style={{ fontSize: `${Math.max(7.5, Math.round(cardHeightPx * 0.09))}px` }}
                     >
                       {label.header}
@@ -153,7 +153,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
 
                 {/* Item Code Number */}
                 <span
-                  className="font-mono font-bold text-gray-800 tracking-wider leading-none"
+                  className="font-mono font-medium text-gray-800 tracking-wider leading-none"
                   style={{ fontSize: `${Math.max(7, Math.round(cardHeightPx * 0.075))}px` }}
                 >
                   {label.barcodeValue}
@@ -162,7 +162,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                 {/* Lines */}
                 {label.line1 && (
                   <span
-                    className="font-bold text-gray-700 truncate max-w-full leading-tight"
+                    className="font-medium text-gray-700 truncate max-w-full leading-tight"
                     style={{ fontSize: `${Math.max(7, Math.round(cardHeightPx * 0.075))}px` }}
                   >
                     {label.line1}
@@ -178,7 +178,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                 )}
                 {label.line3 && (
                   <span
-                    className="font-black text-[#A4164E] truncate max-w-full leading-none"
+                    className="font-semibold text-[#A4164E] truncate max-w-full leading-none"
                     style={{ fontSize: `${Math.max(8, Math.round(cardHeightPx * 0.095))}px` }}
                   >
                     {label.line3}
@@ -200,14 +200,14 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between px-3 py-2 sm:px-6 sm:py-4 border-t border-gray-200 bg-white shrink-0 gap-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-          <span className="text-[11px] sm:text-xs font-bold text-gray-600 truncate mr-2">
+          <span className="text-[11px] sm:text-xs font-medium text-gray-600 truncate mr-2">
             Total {individualLabels.length} pages ready to print
           </span>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
+              className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
             >
               Close
             </button>
@@ -217,7 +217,7 @@ export const BarcodeSheetPreviewModal: React.FC<BarcodeSheetPreviewModalProps> =
                 onClose()
                 onPrint()
               }}
-              className="px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#A4164E] border border-[#A4164E] text-white text-xs font-black uppercase tracking-wider hover:bg-[#85103E] transition-all shadow-md flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
+              className="px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#A4164E] border border-[#A4164E] text-white text-xs font-semibold uppercase tracking-[0.08em] hover:bg-[#85103E] transition-all shadow-md flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0"
             >
               <Printer size={15} /> Print Labels
             </button>
