@@ -556,8 +556,8 @@ export default function PrintableReceipt({ order, paper, size }: PrintableReceip
       </div>
 
       {/* Footer */}
-      <div className="mt-8 pt-4 border-t border-zinc-100 text-center text-[10px] text-zinc-400">
-        Powered by Cenexa Systems © 2026
+      <div className="mt-8 pt-3 border-t border-zinc-300 text-center text-[10px] text-zinc-500">
+        © 2026 {BRAND_EN} • Powered by Cenexa Systems
       </div>
     </div>
   );

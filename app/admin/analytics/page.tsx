@@ -19,6 +19,7 @@ import { refreshOnFocus } from "@/lib/focusRefresh";
 import { BRAND_EN } from "@/lib/brand";
 import { buildXlsx, type XlsxCell } from "@/lib/xlsx";
 import { summarizeCashflow, dedupeAdvance } from "@/lib/paymentSplit";
+import AppFooter from "@/app/components/AppFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -572,10 +573,7 @@ export default function AdminAnalyticsPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 text-center text-[10px] text-gray-400">
-          Powered by Cenexa Systems © 2026
-        </div>
+        <AppFooter />
       </div>
     </div>
   );

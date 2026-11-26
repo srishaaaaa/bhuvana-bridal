@@ -120,6 +120,7 @@ import { calculateTaxAndTotals, formatINR } from "@/lib/money";
 import { getOrderTotals, calculateOrderTotals, calculateBillTotals } from "@/lib/orderTotals";
 import { ORDER_STATUS } from "@/lib/orderStatus";
 import { normalizeOrder } from "@/lib/normalizeOrder";
+import AppFooter from "@/app/components/AppFooter";
 
 // Preset expense categories (users can also type a custom one)
 const EXPENSE_CATEGORIES = [
@@ -4101,9 +4102,6 @@ export default function POSBilling() {
               <div className="min-w-0">
                 <span className="text-[11px] font-bold text-white block uppercase tracking-wider truncate">
                   {role === "admin" ? "Admin Access" : "Staff Access"}
-                </span>
-                <span className="text-[9px] text-white/70 block uppercase tracking-wider font-semibold truncate">
-                  Powered by Cenexa Systems
                 </span>
               </div>
             </div>
@@ -9329,28 +9327,7 @@ export default function POSBilling() {
           onAcknowledge={() => {}}
         />
 
-        {/* Classy Footer */}
-        <footer className="mt-auto pt-10 pb-4 border-t border-black/10 flex flex-col md:flex-row justify-between items-center text-xs font-semibold uppercase tracking-wider gap-4">
-          <div className="text-black">
-            © 2026 ALL RIGHTS RESERVED. {BRAND_EN.toUpperCase()}.
-          </div>
-          <div className="text-black">
-            POWERED BY{" "}
-            <a
-              href="https://www.cenexasystems.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#A4164E] hover:underline font-bold transition-all"
-            >
-              CENEXA SYSTEMS
-            </a>{" "}
-            © 2026
-          </div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase text-gray-700">
-            <span className="w-2 h-2 rounded-full bg-[#A4164E] inline-block shrink-0"></span>
-            <span>SCHOOL OF FASHION DESIGNING • TAILORING • AARI & EMBROIDERY</span>
-          </div>
-        </footer>
+        <AppFooter className="pt-10" />
       </main>
     </div>
   );

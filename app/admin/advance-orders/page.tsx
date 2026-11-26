@@ -27,6 +27,7 @@ import { completeOrder } from "@/lib/completeOrder";
 import InvoiceModal from "@/app/components/InvoiceModal";
 
 import { getOrderTotals, calculateOrderTotals } from "@/lib/orderTotals";
+import AppFooter from "@/app/components/AppFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -586,10 +587,7 @@ export default function AdminAdvanceOrdersPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 text-center text-[10px] text-gray-400">
-          Powered by Cenexa Systems © 2026
-        </div>
+        <AppFooter />
       </div>
 
       {/* ── Completion success popup ───────────────────────────────────────── */}

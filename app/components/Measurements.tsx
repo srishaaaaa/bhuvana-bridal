@@ -225,7 +225,7 @@ export default function Measurements({
           ${filled.length ? filled.map((f) => kv(f.label, it.measurements[f.key])).join("") : `<div class="c sm">None recorded</div>`}
           ${it.remarks?.length ? `<div class="dash"></div><div class="title">REMARKS</div><ol class="rem">${it.remarks.map((m) => `<li>${esc(m)}</li>`).join("")}</ol>` : ""}
           <div class="sig"><div class="line"></div><div class="sl">Authorized Signature</div></div>
-          <div class="c sm foot">Powered by Cenexa Systems © 2026</div>
+          <div class="c sm foot">© 2026 ${esc(BRAND_EN)} • Powered by Cenexa Systems</div>
         </section>`);
       });
     });
@@ -331,7 +331,7 @@ export default function Measurements({
               <div class="sigshop">For ${esc(BRAND_EN)}</div>
             </div>
           </div>
-          <div class="foot">Powered by Cenexa Systems © 2026</div>
+          <div class="foot">© 2026 ${esc(BRAND_EN)} • Powered by Cenexa Systems</div>
         </section>`);
       });
     });

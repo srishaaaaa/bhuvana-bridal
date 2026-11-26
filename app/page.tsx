@@ -1,5 +1,6 @@
 import { MapPin, Clock, Phone, Store, Scissors, Camera, Mail } from "lucide-react";
 import { BRAND_EN, BRAND_SUBTITLE, BRAND_OWNER_NAME, BRAND_ADDRESS, BRAND_PHONE_DISPLAY, BRAND_EMAIL, BRAND_INSTAGRAM, BRAND_INSTAGRAM_LINK } from "@/lib/brand";
+import AppFooter from "@/app/components/AppFooter";
 
 export default function Home() {
   return (
@@ -119,15 +120,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-[#A4164E]/20 py-4 text-center bg-white/90">
-        <p className="text-[11px] font-black text-[#A4164E] tracking-widest uppercase">
-          {BRAND_EN.toUpperCase()}
-        </p>
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5">
-          Powered by Cenexa Systems © 2026
-        </p>
-      </footer>
+      <AppFooter className="px-6" />
     </div>
   );
 }

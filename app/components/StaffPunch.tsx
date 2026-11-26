@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { CheckCircle, LogIn, LogOut, ChevronLeft, Clock, Users, ArrowLeft } from 'lucide-react'
 import { BRAND_EN, BRAND_LOGO } from '@/lib/brand'
 import Link from 'next/link'
+import AppFooter from "@/app/components/AppFooter";
 
 interface Staff {
   id: string
@@ -299,9 +300,7 @@ export default function StaffPunch({ embedded = false }: { embedded?: boolean })
         )}
       </div>
 
-      <footer className="py-4 text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-        Powered by Cenexa Systems © 2026
-      </footer>
+      <AppFooter className="px-4" />
     </div>
   )
 }

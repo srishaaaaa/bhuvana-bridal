@@ -24,6 +24,7 @@ import { BRAND_EN } from "@/lib/brand";
 import { ORDER_STATUS } from "@/lib/orderStatus";
 import { normalizeOrder } from "@/lib/normalizeOrder";
 import { getOrderTotals } from "@/lib/orderTotals";
+import AppFooter from "@/app/components/AppFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -629,10 +630,7 @@ export default function AdminOrdersPage() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 text-center text-[10px] text-gray-400">
-          Powered by Cenexa Systems © 2026
-        </div>
+        <AppFooter />
       </div>
     </div>
   );
